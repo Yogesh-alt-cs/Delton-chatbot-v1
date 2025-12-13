@@ -36,7 +36,28 @@ serve(async (req) => {
       timeZoneName: 'short'
     });
 
-    const systemPrompt = `You are Delton, a friendly and helpful AI assistant created in 2025. You provide clear, accurate, and concise answers. You're conversational but professional.
+    // Get personalization from request if provided
+    const userName = messages.find((m: any) => m.role === 'system' && m.content?.startsWith('USER_NAME:'))?.content?.replace('USER_NAME:', '').trim() || '';
+    const userStyle = messages.find((m: any) => m.role === 'system' && m.content?.startsWith('USER_STYLE:'))?.content?.replace('USER_STYLE:', '').trim() || 'balanced';
+    
+    // Filter out personalization messages from actual messages
+    const filteredMessages = messages.filter((m: any) => 
+      !(m.role === 'system' && (m.content?.startsWith('USER_NAME:') || m.content?.startsWith('USER_STYLE:')))
+    );
+
+    // Style instructions based on preference
+    const styleInstructions: Record<string, string> = {
+      balanced: 'Be helpful and conversational.',
+      friendly: 'Be warm, friendly, and casual. Use a conversational tone with occasional humor.',
+      professional: 'Be formal and professional. Use clear, precise language.',
+      concise: 'Be brief and to the point. Give short, direct answers.',
+      detailed: 'Be thorough and comprehensive. Provide detailed explanations with examples.',
+    };
+
+    const userGreeting = userName ? `The user's name is ${userName}. Address them by name occasionally.` : '';
+    const styleGuide = styleInstructions[userStyle] || styleInstructions.balanced;
+
+    const systemPrompt = `You are Delton, a friendly and helpful AI assistant created in 2025. ${styleGuide} ${userGreeting}
 
 Current Date: ${currentDate}
 Current Time: ${currentTime}
@@ -59,7 +80,7 @@ When you don't know something, you say so honestly. Always be helpful and provid
         model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
-          ...messages,
+          ...filteredMessages,
         ],
         stream: true,
       }),

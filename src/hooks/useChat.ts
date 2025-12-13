@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Message, Conversation } from '@/lib/types';
@@ -15,8 +15,31 @@ export function useChat(options: UseChatOptions = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | undefined>(options.conversationId);
+  const [personalization, setPersonalization] = useState<{ name: string | null; style: string }>({ name: null, style: 'balanced' });
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // Load personalization settings
+  useEffect(() => {
+    const loadPersonalization = async () => {
+      if (!user) return;
+      
+      const { data } = await supabase
+        .from('user_settings')
+        .select('personalization_name, personalization_style')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (data) {
+        setPersonalization({
+          name: data.personalization_name,
+          style: data.personalization_style || 'balanced',
+        });
+      }
+    };
+    
+    loadPersonalization();
+  }, [user]);
 
   const loadConversation = useCallback(async (convId: string) => {
     try {
@@ -129,9 +152,15 @@ export function useChat(options: UseChatOptions = {}) {
       await saveMessage(currentConvId, 'user', content);
 
       // Prepare messages for AI (excluding system messages from history)
-      const chatMessages = [...messages, userMessage]
-        .filter(m => m.role !== 'system')
-        .map(m => ({ role: m.role, content: m.content }));
+      const chatMessages = [
+        // Add personalization as system messages
+        ...(personalization.name ? [{ role: 'system' as const, content: `USER_NAME:${personalization.name}` }] : []),
+        { role: 'system' as const, content: `USER_STYLE:${personalization.style}` },
+        // Add conversation messages
+        ...[...messages, userMessage]
+          .filter(m => m.role !== 'system')
+          .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      ];
 
       // Stream AI response with timeout
       const controller = new AbortController();
