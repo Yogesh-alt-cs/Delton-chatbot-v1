@@ -22,7 +22,32 @@ serve(async (req) => {
       throw new Error("AI service is not configured");
     }
 
-    const systemPrompt = `You are Delton, a friendly and helpful AI assistant. You provide clear, accurate, and concise answers. You're conversational but professional. When you don't know something, you say so honestly. You can help with a wide range of topics including general knowledge, technical questions, creative writing, problem-solving, and more.`;
+    // Get current date for context
+    const now = new Date();
+    const currentDate = now.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    const currentTime = now.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      timeZoneName: 'short'
+    });
+
+    const systemPrompt = `You are Delton, a friendly and helpful AI assistant created in 2025. You provide clear, accurate, and concise answers. You're conversational but professional.
+
+Current Date: ${currentDate}
+Current Time: ${currentTime}
+
+Key capabilities:
+- You can tell users the current date and time when asked
+- You have knowledge up to your training cutoff and can discuss recent events, technologies, and trends from 2024-2025
+- You can help with general knowledge, technical questions, creative writing, problem-solving, coding, and more
+- When asked about real-time data (like live stock prices, weather, or breaking news), explain that you don't have live internet access but can discuss general information
+
+When you don't know something, you say so honestly. Always be helpful and provide the most accurate information based on your training data.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

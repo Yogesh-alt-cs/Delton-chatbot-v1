@@ -1,8 +1,10 @@
-import { useState, useRef, KeyboardEvent } from 'react';
+import { useState, useRef, KeyboardEvent, useEffect } from 'react';
 import { Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { useVoiceInput } from '@/hooks/useVoiceInput';
+import { VoiceInputButton } from './VoiceInputButton';
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -11,7 +13,18 @@ interface ChatInputProps {
 
 export function ChatInput({ onSend, disabled }: ChatInputProps) {
   const [message, setMessage] = useState('');
+  const [interimText, setInterimText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const { isListening, isSupported, toggleListening } = useVoiceInput({
+    onResult: (transcript) => {
+      setMessage((prev) => (prev + ' ' + transcript).trim());
+      setInterimText('');
+    },
+    onInterimResult: (transcript) => {
+      setInterimText(transcript);
+    },
+  });
 
   const handleSend = () => {
     const trimmed = message.trim();
@@ -19,6 +32,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
     
     onSend(trimmed);
     setMessage('');
+    setInterimText('');
     
     // Reset textarea height
     if (textareaRef.current) {
@@ -41,17 +55,32 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
     }
   };
 
+  // Display text with interim results
+  const displayText = interimText ? `${message} ${interimText}`.trim() : message;
+
   return (
     <div className="border-t border-border bg-background p-4">
       <div className="flex items-end gap-2">
+        <VoiceInputButton
+          isListening={isListening}
+          isSupported={isSupported}
+          onClick={toggleListening}
+          disabled={disabled}
+        />
         <Textarea
           ref={textareaRef}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          value={displayText}
+          onChange={(e) => {
+            setMessage(e.target.value);
+            setInterimText('');
+          }}
           onKeyDown={handleKeyDown}
           onInput={handleInput}
-          placeholder="Type a message..."
-          className="min-h-[44px] max-h-32 resize-none rounded-xl"
+          placeholder={isListening ? "Listening..." : "Type a message..."}
+          className={cn(
+            "min-h-[44px] max-h-32 resize-none rounded-xl",
+            isListening && "border-primary"
+          )}
           rows={1}
           disabled={disabled}
         />
