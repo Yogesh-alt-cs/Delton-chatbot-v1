@@ -12,6 +12,7 @@ export interface Conversation {
   title: string;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
 }
 
 export interface UserSettings {
@@ -21,4 +22,17 @@ export interface UserSettings {
   notifications_enabled: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface Feedback {
+  id: string;
+  message_id: string;
+  user_id: string;
+  type: 'like' | 'dislike';
+  created_at: string;
+}
+
+export interface ConversationGroup {
+  label: string;
+  conversations: Conversation[];
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Plus, Menu, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { MessageBubble } from '@/components/chat/MessageBubble';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { useChat } from '@/hooks/useChat';
+import { useFeedback } from '@/hooks/useFeedback';
 import { cn } from '@/lib/utils';
 
 export default function Chat() {
@@ -23,12 +24,25 @@ export default function Chat() {
     },
   });
 
+  const { feedbackMap, loadFeedback, toggleFeedback } = useFeedback();
+
   // Load conversation from URL param
   useEffect(() => {
     if (urlConversationId && urlConversationId !== conversationId) {
       loadConversation(urlConversationId);
     }
   }, [urlConversationId, conversationId, loadConversation]);
+
+  // Load feedback when messages change
+  useEffect(() => {
+    const assistantMessageIds = messages
+      .filter(m => m.role === 'assistant')
+      .map(m => m.id);
+    
+    if (assistantMessageIds.length > 0) {
+      loadFeedback(assistantMessageIds);
+    }
+  }, [messages, loadFeedback]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -53,6 +67,10 @@ export default function Chat() {
     clearChat();
     navigate('/chat', { replace: true });
   };
+
+  const handleFeedback = useCallback((messageId: string, type: 'like' | 'dislike') => {
+    toggleFeedback(messageId, type);
+  }, [toggleFeedback]);
 
   const isLastMessageStreaming = isLoading && messages.length > 0 && 
     messages[messages.length - 1]?.role === 'assistant';
@@ -105,12 +123,16 @@ export default function Chat() {
               {messages.map((message, index) => (
                 <MessageBubble
                   key={message.id}
+                  id={message.id}
                   role={message.role as 'user' | 'assistant'}
                   content={message.content}
                   isStreaming={
                     isLastMessageStreaming && 
                     index === messages.length - 1
                   }
+                  feedback={feedbackMap[message.id]}
+                  onFeedback={handleFeedback}
+                  showActions={message.role === 'assistant'}
                 />
               ))}
               {isLoading && !isLastMessageStreaming && <TypingIndicator />}
