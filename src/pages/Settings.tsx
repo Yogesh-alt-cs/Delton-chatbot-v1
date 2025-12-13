@@ -1,11 +1,19 @@
-import { Moon, Sun, Monitor, LogOut, User, Bell } from 'lucide-react';
+import { Moon, Sun, Monitor, LogOut, User, Bell, Download, FileText, FileJson } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserSettings } from '@/hooks/useUserSettings';
+import { useProfile } from '@/hooks/useProfile';
+import { useExportData } from '@/hooks/useExportData';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const themeOptions = [
   { value: 'light', label: 'Light', icon: Sun },
@@ -14,9 +22,22 @@ const themeOptions = [
 ] as const;
 
 export default function Settings() {
-  const { theme, setTheme } = useTheme();
   const { user, signOut } = useAuth();
+  const { settings, updateSettings } = useUserSettings();
+  const { profile } = useProfile();
+  const { exportConversations } = useExportData();
   const navigate = useNavigate();
+
+  const currentTheme = settings?.theme || 'system';
+  const notificationsEnabled = settings?.notifications_enabled ?? true;
+
+  const handleThemeChange = (theme: 'light' | 'dark' | 'system') => {
+    updateSettings({ theme });
+  };
+
+  const handleNotificationsChange = (enabled: boolean) => {
+    updateSettings({ notifications_enabled: enabled });
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -33,14 +54,27 @@ export default function Settings() {
 
         <div className="flex-1 p-4 space-y-6">
           {/* Profile Section */}
-          <section className="rounded-xl border border-border bg-card p-4">
+          <section 
+            className="rounded-xl border border-border bg-card p-4 cursor-pointer transition-colors hover:bg-muted/50"
+            onClick={() => navigate('/profile')}
+          >
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                <User className="h-6 w-6 text-primary" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 overflow-hidden">
+                {profile?.avatar_url ? (
+                  <img 
+                    src={profile.avatar_url} 
+                    alt="Avatar" 
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <User className="h-6 w-6 text-primary" />
+                )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="truncate font-medium">{user?.email}</p>
-                <p className="text-sm text-muted-foreground">Manage your account</p>
+                <p className="truncate font-medium">
+                  {profile?.display_name || user?.email}
+                </p>
+                <p className="text-sm text-muted-foreground">View profile</p>
               </div>
             </div>
           </section>
@@ -52,21 +86,21 @@ export default function Settings() {
               {themeOptions.map(({ value, label, icon: Icon }) => (
                 <button
                   key={value}
-                  onClick={() => setTheme(value)}
+                  onClick={() => handleThemeChange(value)}
                   className={cn(
                     "flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-all",
-                    theme === value
+                    currentTheme === value
                       ? "border-primary bg-primary/5"
                       : "border-transparent bg-muted hover:bg-muted/80"
                   )}
                 >
                   <Icon className={cn(
                     "h-5 w-5",
-                    theme === value ? "text-primary" : "text-muted-foreground"
+                    currentTheme === value ? "text-primary" : "text-muted-foreground"
                   )} />
                   <span className={cn(
                     "text-xs font-medium",
-                    theme === value ? "text-primary" : "text-muted-foreground"
+                    currentTheme === value ? "text-primary" : "text-muted-foreground"
                   )}>
                     {label}
                   </span>
@@ -87,7 +121,42 @@ export default function Settings() {
                   </p>
                 </div>
               </div>
-              <Switch />
+              <Switch 
+                checked={notificationsEnabled}
+                onCheckedChange={handleNotificationsChange}
+              />
+            </div>
+          </section>
+
+          {/* Export Data Section */}
+          <section className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Download className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="font-medium">Export Data</p>
+                  <p className="text-sm text-muted-foreground">
+                    Download your conversations
+                  </p>
+                </div>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    Export
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => exportConversations('txt')}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Export as TXT
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportConversations('json')}>
+                    <FileJson className="mr-2 h-4 w-4" />
+                    Export as JSON
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </section>
 

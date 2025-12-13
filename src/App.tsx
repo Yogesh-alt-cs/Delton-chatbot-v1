@@ -12,6 +12,8 @@ import Auth from "@/pages/Auth";
 import Chat from "@/pages/Chat";
 import History from "@/pages/History";
 import Settings from "@/pages/Settings";
+import Profile from "@/pages/Profile";
+import ProfileEdit from "@/pages/ProfileEdit";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -59,6 +61,22 @@ const App = () => (
                 element={
                   <AuthGuard>
                     <Settings />
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <AuthGuard>
+                    <Profile />
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/profile/edit"
+                element={
+                  <AuthGuard>
+                    <ProfileEdit />
                   </AuthGuard>
                 }
               />
