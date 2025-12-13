@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MessageSquare, Trash2, ChevronRight } from 'lucide-react';
+import { Search, MessageSquare, Trash2, ChevronRight, Share2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useConversations } from '@/hooks/useConversations';
+import { useShareConversation } from '@/hooks/useShareConversation';
 import { useToast } from '@/hooks/use-toast';
 import { groupConversationsByDate, formatConversationDate } from '@/lib/dateUtils';
 import { Conversation } from '@/lib/types';
@@ -22,6 +23,7 @@ import {
 export default function History() {
   const navigate = useNavigate();
   const { conversations, isLoading, searchConversations, deleteConversation } = useConversations();
+  const { shareConversation } = useShareConversation();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Conversation[] | null>(null);
@@ -147,6 +149,14 @@ export default function History() {
                           </div>
                           <ChevronRight className="h-5 w-5 text-muted-foreground" />
                         </button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-10 w-10 shrink-0 text-muted-foreground hover:text-primary"
+                          onClick={() => shareConversation(conv.id, conv.title)}
+                        >
+                          <Share2 className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"

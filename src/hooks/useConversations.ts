@@ -114,12 +114,15 @@ export function useConversations() {
   }, [user, conversations]);
 
   const deleteConversation = useCallback(async (id: string) => {
+    if (!user) return false;
+    
     try {
-      // Soft delete
+      // Soft delete - need to include user_id for RLS policy
       const { error } = await supabase
         .from('conversations')
         .update({ deleted_at: new Date().toISOString() })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id);
 
       if (error) throw error;
       
@@ -129,7 +132,7 @@ export function useConversations() {
       console.error('Error deleting conversation:', error);
       return false;
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     loadConversations();
