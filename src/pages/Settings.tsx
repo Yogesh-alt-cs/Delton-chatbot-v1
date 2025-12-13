@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useProfile } from '@/hooks/useProfile';
 import { useExportData } from '@/hooks/useExportData';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import {
@@ -26,6 +27,7 @@ export default function Settings() {
   const { settings, updateSettings } = useUserSettings();
   const { profile } = useProfile();
   const { exportConversations } = useExportData();
+  const { isSupported: notificationsSupported, isEnabled: pushEnabled, toggleNotifications } = usePushNotifications();
   const navigate = useNavigate();
 
   const currentTheme = settings?.theme || 'system';
@@ -35,8 +37,15 @@ export default function Settings() {
     updateSettings({ theme });
   };
 
-  const handleNotificationsChange = (enabled: boolean) => {
-    updateSettings({ notifications_enabled: enabled });
+  const handleNotificationsChange = async (enabled: boolean) => {
+    if (enabled && notificationsSupported) {
+      const granted = await toggleNotifications();
+      if (granted) {
+        updateSettings({ notifications_enabled: true });
+      }
+    } else {
+      updateSettings({ notifications_enabled: enabled });
+    }
   };
 
   const handleSignOut = async () => {
@@ -115,15 +124,18 @@ export default function Settings() {
               <div className="flex items-center gap-3">
                 <Bell className="h-5 w-5 text-muted-foreground" />
                 <div>
-                  <p className="font-medium">Notifications</p>
+                  <p className="font-medium">Push Notifications</p>
                   <p className="text-sm text-muted-foreground">
-                    Receive push notifications
+                    {notificationsSupported 
+                      ? (pushEnabled ? 'Enabled' : 'Get updates and alerts')
+                      : 'Not supported in this browser'}
                   </p>
                 </div>
               </div>
               <Switch 
-                checked={notificationsEnabled}
+                checked={notificationsEnabled && pushEnabled}
                 onCheckedChange={handleNotificationsChange}
+                disabled={!notificationsSupported}
               />
             </div>
           </section>
