@@ -8,6 +8,9 @@ export interface UserSettings {
   user_id: string;
   theme: string;
   notifications_enabled: boolean;
+  tts_voice_name: string;
+  personalization_name: string | null;
+  personalization_style: string;
   created_at: string;
   updated_at: string;
 }
@@ -35,7 +38,7 @@ export function useUserSettings() {
       if (error) throw error;
       
       if (data) {
-        setSettings(data);
+        setSettings(data as UserSettings);
         // Sync theme from database
         if (data.theme === 'light' || data.theme === 'dark' || data.theme === 'system') {
           setTheme(data.theme);
@@ -52,7 +55,7 @@ export function useUserSettings() {
     fetchSettings();
   }, [fetchSettings]);
 
-  const updateSettings = async (updates: Partial<Pick<UserSettings, 'theme' | 'notifications_enabled'>>) => {
+  const updateSettings = async (updates: Partial<Pick<UserSettings, 'theme' | 'notifications_enabled' | 'tts_voice_name' | 'personalization_name' | 'personalization_style'>>) => {
     if (!user) return;
 
     try {
@@ -74,5 +77,23 @@ export function useUserSettings() {
     }
   };
 
-  return { settings, loading, updateSettings };
+  const clearAllHistory = async (): Promise<boolean> => {
+    if (!user) return false;
+
+    try {
+      const { error } = await supabase
+        .from('conversations')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('user_id', user.id)
+        .is('deleted_at', null);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error clearing history:', error);
+      return false;
+    }
+  };
+
+  return { settings, loading, updateSettings, clearAllHistory };
 }

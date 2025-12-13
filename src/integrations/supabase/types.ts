@@ -140,7 +140,10 @@ export type Database = {
           created_at: string
           id: string
           notifications_enabled: boolean
+          personalization_name: string | null
+          personalization_style: string | null
           theme: string
+          tts_voice_name: string | null
           updated_at: string
           user_id: string
         }
@@ -148,7 +151,10 @@ export type Database = {
           created_at?: string
           id?: string
           notifications_enabled?: boolean
+          personalization_name?: string | null
+          personalization_style?: string | null
           theme?: string
+          tts_voice_name?: string | null
           updated_at?: string
           user_id: string
         }
@@ -156,7 +162,10 @@ export type Database = {
           created_at?: string
           id?: string
           notifications_enabled?: boolean
+          personalization_name?: string | null
+          personalization_style?: string | null
           theme?: string
+          tts_voice_name?: string | null
           updated_at?: string
           user_id?: string
         }

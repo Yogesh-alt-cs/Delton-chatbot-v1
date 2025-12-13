@@ -1,4 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface UseTextToSpeechOptions {
   rate?: number;
@@ -13,7 +15,28 @@ export function useTextToSpeech(options: UseTextToSpeechOptions = {}) {
   const [isPaused, setIsPaused] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | null>(null);
+  const [savedVoiceName, setSavedVoiceName] = useState<string | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const { user } = useAuth();
+
+  // Load saved voice preference
+  useEffect(() => {
+    const loadSavedVoice = async () => {
+      if (!user) return;
+      
+      const { data } = await supabase
+        .from('user_settings')
+        .select('tts_voice_name')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (data?.tts_voice_name && data.tts_voice_name !== 'default') {
+        setSavedVoiceName(data.tts_voice_name);
+      }
+    };
+    
+    loadSavedVoice();
+  }, [user]);
 
   useEffect(() => {
     const supported = 'speechSynthesis' in window;
@@ -23,6 +46,15 @@ export function useTextToSpeech(options: UseTextToSpeechOptions = {}) {
       const loadVoices = () => {
         const availableVoices = speechSynthesis.getVoices();
         setVoices(availableVoices);
+        
+        // If we have a saved voice preference, use it
+        if (savedVoiceName) {
+          const savedVoice = availableVoices.find(v => v.name === savedVoiceName);
+          if (savedVoice) {
+            setSelectedVoice(savedVoice);
+            return;
+          }
+        }
         
         // Select a good default voice (prefer English voices)
         const englishVoice = availableVoices.find(
@@ -43,7 +75,7 @@ export function useTextToSpeech(options: UseTextToSpeechOptions = {}) {
         speechSynthesis.onvoiceschanged = null;
       };
     }
-  }, [selectedVoice]);
+  }, [savedVoiceName, selectedVoice]);
 
   const speak = useCallback((text: string) => {
     if (!isSupported || !text.trim()) return;
@@ -107,6 +139,13 @@ export function useTextToSpeech(options: UseTextToSpeechOptions = {}) {
     }
   }, [isPaused, isSpeaking, pause, resume]);
 
+  const setVoiceByName = useCallback((voiceName: string) => {
+    const voice = voices.find(v => v.name === voiceName);
+    if (voice) {
+      setSelectedVoice(voice);
+    }
+  }, [voices]);
+
   return {
     isSupported,
     isSpeaking,
@@ -114,6 +153,7 @@ export function useTextToSpeech(options: UseTextToSpeechOptions = {}) {
     voices,
     selectedVoice,
     setSelectedVoice,
+    setVoiceByName,
     speak,
     stop,
     pause,
