@@ -1,19 +1,34 @@
 import { cn } from '@/lib/utils';
 import { Bot, User } from 'lucide-react';
+import { MessageActions } from './MessageActions';
+import { Feedback } from '@/lib/types';
 
 interface MessageBubbleProps {
+  id: string;
   role: 'user' | 'assistant';
   content: string;
   isStreaming?: boolean;
+  feedback?: Feedback;
+  onFeedback?: (messageId: string, type: 'like' | 'dislike') => void;
+  showActions?: boolean;
 }
 
-export function MessageBubble({ role, content, isStreaming }: MessageBubbleProps) {
+export function MessageBubble({ 
+  id,
+  role, 
+  content, 
+  isStreaming,
+  feedback,
+  onFeedback,
+  showActions = true
+}: MessageBubbleProps) {
   const isUser = role === 'user';
+  const isAssistant = role === 'assistant';
 
   return (
     <div
       className={cn(
-        "flex gap-3 px-4 py-3",
+        "group flex gap-3 px-4 py-3",
         isUser ? "flex-row-reverse" : "flex-row"
       )}
     >
@@ -31,21 +46,34 @@ export function MessageBubble({ role, content, isStreaming }: MessageBubbleProps
         )}
       </div>
 
-      {/* Message */}
-      <div
-        className={cn(
-          "flex max-w-[85%] flex-col gap-1 rounded-2xl px-4 py-2.5",
-          isUser
-            ? "bg-primary text-primary-foreground rounded-br-md"
-            : "bg-muted text-foreground rounded-bl-md"
-        )}
-      >
-        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-          {content}
-          {isStreaming && (
-            <span className="ml-1 inline-block h-4 w-1 animate-pulse bg-current" />
+      {/* Message Container */}
+      <div className={cn("flex flex-col gap-1", isUser ? "items-end" : "items-start")}>
+        {/* Bubble */}
+        <div
+          className={cn(
+            "max-w-[85%] rounded-2xl px-4 py-2.5",
+            isUser
+              ? "bg-primary text-primary-foreground rounded-br-md"
+              : "bg-muted text-foreground rounded-bl-md"
           )}
-        </p>
+        >
+          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+            {content}
+            {isStreaming && (
+              <span className="ml-1 inline-block h-4 w-1 animate-pulse bg-current" />
+            )}
+          </p>
+        </div>
+
+        {/* Actions (only for assistant messages) */}
+        {isAssistant && showActions && !isStreaming && content && onFeedback && (
+          <MessageActions
+            messageId={id}
+            content={content}
+            feedback={feedback}
+            onFeedback={onFeedback}
+          />
+        )}
       </div>
     </div>
   );
