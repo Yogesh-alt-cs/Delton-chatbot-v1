@@ -1,78 +1,141 @@
-import { useState } from 'react';
-import { Send, Plus, Menu } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Plus, Menu, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { MessageBubble } from '@/components/chat/MessageBubble';
+import { TypingIndicator } from '@/components/chat/TypingIndicator';
+import { ChatInput } from '@/components/chat/ChatInput';
+import { useChat } from '@/hooks/useChat';
 import { cn } from '@/lib/utils';
 
 export default function Chat() {
-  const [message, setMessage] = useState('');
+  const navigate = useNavigate();
+  const { conversationId: urlConversationId } = useParams();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
-  const handleSend = () => {
-    if (!message.trim()) return;
-    // TODO: Implement chat functionality in Phase 2
-    setMessage('');
-  };
+  const { messages, isLoading, conversationId, sendMessage, loadConversation, clearChat } = useChat({
+    conversationId: urlConversationId,
+    onConversationCreated: (conversation) => {
+      navigate(`/chat/${conversation.id}`, { replace: true });
+    },
+  });
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
+  // Load conversation from URL param
+  useEffect(() => {
+    if (urlConversationId && urlConversationId !== conversationId) {
+      loadConversation(urlConversationId);
     }
+  }, [urlConversationId, conversationId, loadConversation]);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Track scroll position
+  const handleScroll = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+    setShowScrollButton(!isNearBottom && messages.length > 0);
   };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleNewChat = () => {
+    clearChat();
+    navigate('/chat', { replace: true });
+  };
+
+  const isLastMessageStreaming = isLoading && messages.length > 0 && 
+    messages[messages.length - 1]?.role === 'assistant';
 
   return (
     <AppLayout>
       <div className="flex h-[calc(100vh-4rem)] flex-col">
         {/* Header */}
         <header className="flex h-14 items-center justify-between border-b border-border px-4 safe-top">
-          <Button variant="ghost" size="icon" className="h-10 w-10">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-10 w-10"
+            onClick={() => navigate('/history')}
+          >
             <Menu className="h-5 w-5" />
           </Button>
-          <h1 className="font-semibold">New Chat</h1>
-          <Button variant="ghost" size="icon" className="h-10 w-10">
+          <h1 className="font-semibold">
+            {conversationId ? 'Chat' : 'New Chat'}
+          </h1>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-10 w-10"
+            onClick={handleNewChat}
+          >
             <Plus className="h-5 w-5" />
           </Button>
         </header>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {/* Empty State */}
-          <div className="flex h-full flex-col items-center justify-center text-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-              <span className="text-3xl">👋</span>
+        <div 
+          ref={scrollContainerRef}
+          className="relative flex-1 overflow-y-auto"
+          onScroll={handleScroll}
+        >
+          {messages.length === 0 ? (
+            /* Empty State */
+            <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+                <span className="text-3xl">👋</span>
+              </div>
+              <h2 className="mb-2 text-xl font-semibold">Welcome to Delton</h2>
+              <p className="max-w-xs text-sm text-muted-foreground">
+                Start a conversation by typing a message below. I'm here to help with anything you need!
+              </p>
             </div>
-            <h2 className="mb-2 text-xl font-semibold">Welcome to Delton</h2>
-            <p className="max-w-xs text-sm text-muted-foreground">
-              Start a conversation by typing a message below. I'm here to help with anything you need!
-            </p>
-          </div>
+          ) : (
+            <div className="py-4">
+              {messages.map((message, index) => (
+                <MessageBubble
+                  key={message.id}
+                  role={message.role as 'user' | 'assistant'}
+                  content={message.content}
+                  isStreaming={
+                    isLastMessageStreaming && 
+                    index === messages.length - 1
+                  }
+                />
+              ))}
+              {isLoading && !isLastMessageStreaming && <TypingIndicator />}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+
+          {/* Scroll to bottom button */}
+          {showScrollButton && (
+            <Button
+              size="icon"
+              variant="secondary"
+              className={cn(
+                "absolute bottom-4 right-4 h-10 w-10 rounded-full shadow-lg",
+                "transition-all hover:scale-105"
+              )}
+              onClick={scrollToBottom}
+            >
+              <ArrowDown className="h-5 w-5" />
+            </Button>
+          )}
         </div>
 
         {/* Input Area */}
-        <div className="border-t border-border bg-background p-4">
-          <div className="flex items-end gap-2">
-            <Textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Type a message..."
-              className="min-h-[44px] max-h-32 resize-none rounded-xl"
-              rows={1}
-            />
-            <Button
-              size="icon"
-              className={cn(
-                "h-11 w-11 shrink-0 rounded-xl transition-all",
-                !message.trim() && "opacity-50"
-              )}
-              disabled={!message.trim()}
-              onClick={handleSend}
-            >
-              <Send className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
+        <ChatInput onSend={sendMessage} disabled={isLoading} />
       </div>
     </AppLayout>
   );
