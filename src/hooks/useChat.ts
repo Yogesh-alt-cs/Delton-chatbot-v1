@@ -133,26 +133,47 @@ export function useChat(options: UseChatOptions = {}) {
         .filter(m => m.role !== 'system')
         .map(m => ({ role: m.role, content: m.content }));
 
-      // Stream AI response
-      const response = await fetch(CHAT_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({
-          messages: chatMessages,
-          conversationId: currentConvId,
-        }),
-      });
+      // Stream AI response with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
+      let response: Response;
+      try {
+        response = await fetch(CHAT_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            messages: chatMessages,
+            conversationId: currentConvId,
+          }),
+          signal: controller.signal,
+        });
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          throw new Error('Request timed out. Please try again.');
+        }
+        throw new Error('Network error. Please check your connection and try again.');
+      }
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        if (response.status === 429) {
+          throw new Error('Rate limit exceeded. Please wait a moment and try again.');
+        }
+        if (response.status === 402) {
+          throw new Error('AI credits exhausted. Please add credits to continue.');
+        }
+        throw new Error(errorData.error || `Request failed. Please try again.`);
       }
 
       if (!response.body) {
-        throw new Error('No response body');
+        throw new Error('No response received. Please try again.');
       }
 
       // Stream the response
@@ -171,44 +192,53 @@ export function useChat(options: UseChatOptions = {}) {
       };
       setMessages((prev) => [...prev, assistantMessage]);
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-        textBuffer += decoder.decode(value, { stream: true });
+          textBuffer += decoder.decode(value, { stream: true });
 
-        // Process line by line
-        let newlineIndex: number;
-        while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
-          let line = textBuffer.slice(0, newlineIndex);
-          textBuffer = textBuffer.slice(newlineIndex + 1);
+          // Process line by line
+          let newlineIndex: number;
+          while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
+            let line = textBuffer.slice(0, newlineIndex);
+            textBuffer = textBuffer.slice(newlineIndex + 1);
 
-          if (line.endsWith('\r')) line = line.slice(0, -1);
-          if (line.startsWith(':') || line.trim() === '') continue;
-          if (!line.startsWith('data: ')) continue;
+            if (line.endsWith('\r')) line = line.slice(0, -1);
+            if (line.startsWith(':') || line.trim() === '') continue;
+            if (!line.startsWith('data: ')) continue;
 
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === '[DONE]') break;
+            const jsonStr = line.slice(6).trim();
+            if (jsonStr === '[DONE]') break;
 
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const delta = parsed.choices?.[0]?.delta?.content;
-            if (delta) {
-              assistantContent += delta;
-              setMessages((prev) => {
-                const updated = [...prev];
-                const lastMsg = updated[updated.length - 1];
-                if (lastMsg?.role === 'assistant') {
-                  updated[updated.length - 1] = { ...lastMsg, content: assistantContent };
-                }
-                return updated;
-              });
+            try {
+              const parsed = JSON.parse(jsonStr);
+              const delta = parsed.choices?.[0]?.delta?.content;
+              if (delta) {
+                assistantContent += delta;
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const lastMsg = updated[updated.length - 1];
+                  if (lastMsg?.role === 'assistant') {
+                    updated[updated.length - 1] = { ...lastMsg, content: assistantContent };
+                  }
+                  return updated;
+                });
+              }
+            } catch {
+              // Incomplete JSON, put back and wait
+              textBuffer = line + '\n' + textBuffer;
+              break;
             }
-          } catch {
-            // Incomplete JSON, put back and wait
-            textBuffer = line + '\n' + textBuffer;
-            break;
           }
+        }
+      } catch (streamError) {
+        // If we got partial content, keep it and save what we have
+        if (assistantContent) {
+          console.log('Stream interrupted, saving partial response');
+        } else {
+          throw new Error('Connection lost. Please try again.');
         }
       }
 
