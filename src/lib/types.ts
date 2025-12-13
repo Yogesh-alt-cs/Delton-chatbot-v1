@@ -13,6 +13,8 @@ export interface Conversation {
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
+  archived_at?: string | null;
+  expires_at?: string | null;
 }
 
 export interface UserSettings {
