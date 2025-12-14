@@ -211,57 +211,129 @@ export function VoiceConversation({
   const startListening = useCallback(() => {
     const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     
-    if (!SpeechRecognitionClass || isSpeaking || isProcessing) return;
+    if (!SpeechRecognitionClass) {
+      console.error('Speech recognition not supported');
+      return;
+    }
+    
+    if (isSpeaking || isProcessing) {
+      console.log('Cannot start listening: speaking or processing');
+      return;
+    }
+
+    // Stop any existing recognition first
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (e) {
+        // Ignore
+      }
+      recognitionRef.current = null;
+    }
 
     const recognition: ISpeechRecognition = new SpeechRecognitionClass();
-    recognition.continuous = true;
+    recognition.continuous = false; // Changed to false for better reliability
     recognition.interimResults = true;
     recognition.lang = 'en-US';
 
+    let finalTranscript = '';
+
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const results = Array.from({ length: event.results.length }, (_, i) => event.results[i]);
-      const currentTranscript = results
-        .map(result => result[0].transcript)
-        .join('');
+      let interimTranscript = '';
       
-      setTranscript(currentTranscript);
+      for (let i = 0; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          finalTranscript += result[0].transcript;
+        } else {
+          interimTranscript += result[0].transcript;
+        }
+      }
       
-      const isFinal = results.some(result => result.isFinal);
+      // Show interim results
+      if (interimTranscript) {
+        setTranscript(interimTranscript);
+      }
       
-      if (isFinal && currentTranscript.trim()) {
+      // Process final result
+      if (finalTranscript.trim()) {
+        console.log('Final transcript:', finalTranscript.trim());
         setTranscript('');
-        recognition.stop();
-        sendToAI(currentTranscript.trim());
+        const messageToSend = finalTranscript.trim();
+        finalTranscript = ''; // Reset for next recognition
+        sendToAI(messageToSend);
       }
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error('Speech recognition error:', event.error);
-      if (event.error !== 'aborted' && event.error !== 'no-speech') {
+      setIsListening(false);
+      
+      // Handle specific errors
+      if (event.error === 'no-speech') {
+        // No speech detected, restart listening
+        console.log('No speech detected, restarting...');
+        if (shouldRestartRef.current && !isProcessing && !isSpeaking) {
+          setTimeout(() => {
+            if (shouldRestartRef.current) {
+              startListening();
+            }
+          }, 300);
+        }
+      } else if (event.error === 'aborted') {
+        // Recognition was aborted, this is expected during mode switches
+        console.log('Recognition aborted');
+      } else if (event.error === 'network') {
         toast({
-          title: 'Voice Error',
-          description: 'Speech recognition error. Retrying...',
+          title: 'Network Error',
+          description: 'Please check your internet connection.',
           variant: 'destructive',
         });
+      } else if (event.error === 'not-allowed') {
+        toast({
+          title: 'Microphone Blocked',
+          description: 'Please allow microphone access in your browser.',
+          variant: 'destructive',
+        });
+        shouldRestartRef.current = false;
+        setIsActive(false);
       }
-      setIsListening(false);
     };
 
     recognition.onend = () => {
+      console.log('Recognition ended, isActive:', shouldRestartRef.current);
       setIsListening(false);
-      // Auto-restart if still active and not processing
+      
+      // Auto-restart if still active and not processing/speaking
       if (shouldRestartRef.current && !isProcessing && !isSpeaking) {
+        setTimeout(() => {
+          if (shouldRestartRef.current && !isProcessing && !isSpeaking) {
+            console.log('Auto-restarting listening...');
+            startListening();
+          }
+        }, 300);
+      }
+    };
+
+    recognitionRef.current = recognition;
+    
+    try {
+      recognition.start();
+      console.log('Recognition started successfully');
+      setIsListening(true);
+    } catch (error) {
+      console.error('Failed to start recognition:', error);
+      setIsListening(false);
+      
+      // Retry after a short delay
+      if (shouldRestartRef.current) {
         setTimeout(() => {
           if (shouldRestartRef.current) {
             startListening();
           }
         }, 500);
       }
-    };
-
-    recognitionRef.current = recognition;
-    recognition.start();
-    setIsListening(true);
+    }
   }, [isSpeaking, isProcessing, sendToAI, toast]);
 
   const stopListening = useCallback(() => {
@@ -275,13 +347,18 @@ export function VoiceConversation({
 
   const startConversation = useCallback(async () => {
     try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-      shouldRestartRef.current = true;
-      setIsActive(true);
-      startListening();
+      // Request microphone permission
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(track => track.stop()); // Release the stream
       
-      // Welcome message
+      setIsActive(true);
+      shouldRestartRef.current = true;
+      
+      // Welcome message first, then start listening
       await speakText("Hi! I'm Delton, your AI assistant. How can I help you today?");
+      
+      // Start listening after welcome message
+      startListening();
     } catch (error) {
       console.error('Microphone access error:', error);
       toast({
@@ -302,17 +379,7 @@ export function VoiceConversation({
     setTranscript('');
   }, [stopListening]);
 
-  // Auto-restart listening after AI finishes speaking
-  useEffect(() => {
-    if (isActive && !isSpeaking && !isProcessing && !isListening) {
-      const timer = setTimeout(() => {
-        if (shouldRestartRef.current) {
-          startListening();
-        }
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isActive, isSpeaking, isProcessing, isListening, startListening]);
+  // Note: Auto-restart is now handled in recognition.onend callback
 
   if (!isSupported) {
     return null;
