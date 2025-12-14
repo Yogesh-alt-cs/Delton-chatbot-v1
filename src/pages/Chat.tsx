@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, Menu, ArrowDown, Phone, MessageSquare, Mic } from 'lucide-react';
+import { Plus, Menu, ArrowDown, Phone, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { MessageBubble } from '@/components/chat/MessageBubble';
@@ -9,12 +9,10 @@ import { ChatInput } from '@/components/chat/ChatInput';
 import { VoiceConversation } from '@/components/chat/VoiceConversation';
 import { useChat } from '@/hooks/useChat';
 import { useFeedback } from '@/hooks/useFeedback';
-import { useWakeWord } from '@/hooks/useWakeWord';
 import { useReminders } from '@/hooks/useReminders';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
 
 export default function Chat() {
   const navigate = useNavigate();
@@ -24,22 +22,10 @@ export default function Chat() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [mode, setMode] = useState<'text' | 'voice'>('text');
-  const [wakeWordEnabled, setWakeWordEnabled] = useState(true);
   const [personalization, setPersonalization] = useState<{ name: string | null; style: string; language: string }>({ name: null, style: 'balanced', language: 'en-US' });
 
   // Initialize reminders hook for parsing AI responses
   const { parseAndCreateReminder } = useReminders();
-
-  // Wake word detection
-  const { isListening: isWakeWordListening, isSupported: wakeWordSupported } = useWakeWord({
-    wakeWord: 'hey delton',
-    onWakeWordDetected: () => {
-      toast.success('Hey! I heard you! 👋', { duration: 2000 });
-      setMode('voice');
-      setWakeWordEnabled(false); // Disable wake word while in voice mode
-    },
-    enabled: wakeWordEnabled && mode === 'text',
-  });
 
   const { messages, isLoading, conversationId, sendMessage, loadConversation, clearChat } = useChat({
     conversationId: urlConversationId,
