@@ -80,10 +80,19 @@ export default {
             height: "0",
           },
         },
+        "wave": {
+          "0%, 100%": {
+            height: "8px",
+          },
+          "50%": {
+            height: "32px",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "wave": "wave 0.5s ease-in-out infinite",
       },
     },
   },

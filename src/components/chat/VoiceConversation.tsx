@@ -58,6 +58,27 @@ interface VoiceConversationProps {
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
+// Wave animation component
+function WaveAnimation({ isActive }: { isActive: boolean }) {
+  return (
+    <div className="flex items-center justify-center gap-1 h-8">
+      {[...Array(5)].map((_, i) => (
+        <div
+          key={i}
+          className={cn(
+            "w-1 bg-emerald-500 rounded-full transition-all duration-150",
+            isActive ? "animate-wave" : "h-1"
+          )}
+          style={{
+            animationDelay: `${i * 0.1}s`,
+            height: isActive ? undefined : '4px',
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function VoiceConversation({ 
   onMessage, 
   onSaveMessage,
@@ -70,6 +91,7 @@ export function VoiceConversation({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [interimTranscript, setInterimTranscript] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
@@ -232,35 +254,34 @@ export function VoiceConversation({
     }
 
     const recognition: ISpeechRecognition = new SpeechRecognitionClass();
-    recognition.continuous = false; // Changed to false for better reliability
+    recognition.continuous = false;
     recognition.interimResults = true;
     recognition.lang = personalization.language || 'en-US';
 
     let finalTranscript = '';
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let interimTranscript = '';
+      let interim = '';
       
       for (let i = 0; i < event.results.length; i++) {
         const result = event.results[i];
         if (result.isFinal) {
           finalTranscript += result[0].transcript;
         } else {
-          interimTranscript += result[0].transcript;
+          interim += result[0].transcript;
         }
       }
       
-      // Show interim results
-      if (interimTranscript) {
-        setTranscript(interimTranscript);
-      }
+      // Show real-time interim results
+      setInterimTranscript(interim);
       
       // Process final result
       if (finalTranscript.trim()) {
         console.log('Final transcript:', finalTranscript.trim());
-        setTranscript('');
+        setTranscript(finalTranscript.trim());
+        setInterimTranscript('');
         const messageToSend = finalTranscript.trim();
-        finalTranscript = ''; // Reset for next recognition
+        finalTranscript = '';
         sendToAI(messageToSend);
       }
     };
@@ -268,10 +289,9 @@ export function VoiceConversation({
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error('Speech recognition error:', event.error);
       setIsListening(false);
+      setInterimTranscript('');
       
-      // Handle specific errors
       if (event.error === 'no-speech') {
-        // No speech detected, restart listening
         console.log('No speech detected, restarting...');
         if (shouldRestartRef.current && !isProcessing && !isSpeaking) {
           setTimeout(() => {
@@ -281,7 +301,6 @@ export function VoiceConversation({
           }, 300);
         }
       } else if (event.error === 'aborted') {
-        // Recognition was aborted, this is expected during mode switches
         console.log('Recognition aborted');
       } else if (event.error === 'network') {
         toast({
@@ -304,7 +323,6 @@ export function VoiceConversation({
       console.log('Recognition ended, isActive:', shouldRestartRef.current);
       setIsListening(false);
       
-      // Auto-restart if still active and not processing/speaking
       if (shouldRestartRef.current && !isProcessing && !isSpeaking) {
         setTimeout(() => {
           if (shouldRestartRef.current && !isProcessing && !isSpeaking) {
@@ -321,11 +339,11 @@ export function VoiceConversation({
       recognition.start();
       console.log('Recognition started successfully');
       setIsListening(true);
+      setInterimTranscript('');
     } catch (error) {
       console.error('Failed to start recognition:', error);
       setIsListening(false);
       
-      // Retry after a short delay
       if (shouldRestartRef.current) {
         setTimeout(() => {
           if (shouldRestartRef.current) {
@@ -334,7 +352,7 @@ export function VoiceConversation({
         }, 500);
       }
     }
-  }, [isSpeaking, isProcessing, sendToAI, toast]);
+  }, [isSpeaking, isProcessing, sendToAI, toast, personalization.language]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
@@ -343,21 +361,19 @@ export function VoiceConversation({
     }
     setIsListening(false);
     setTranscript('');
+    setInterimTranscript('');
   }, []);
 
   const startConversation = useCallback(async () => {
     try {
       // Request microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(track => track.stop()); // Release the stream
+      stream.getTracks().forEach(track => track.stop());
       
       setIsActive(true);
       shouldRestartRef.current = true;
       
-      // Welcome message first, then start listening
-      await speakText("Hi! I'm Delton, your AI assistant. How can I help you today?");
-      
-      // Start listening after welcome message
+      // Start listening immediately without welcome message
       startListening();
     } catch (error) {
       console.error('Microphone access error:', error);
@@ -367,7 +383,7 @@ export function VoiceConversation({
         variant: 'destructive',
       });
     }
-  }, [startListening, speakText, toast]);
+  }, [startListening, toast]);
 
   const endConversation = useCallback(() => {
     shouldRestartRef.current = false;
@@ -377,21 +393,56 @@ export function VoiceConversation({
     setIsSpeaking(false);
     setMessages([]);
     setTranscript('');
+    setInterimTranscript('');
   }, [stopListening]);
-
-  // Note: Auto-restart is now handled in recognition.onend callback
 
   if (!isSupported) {
     return null;
   }
 
+  const displayText = interimTranscript || transcript;
+
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-6 w-full max-w-md">
       {isActive ? (
         <>
+          {/* Real-time transcription display */}
+          <div className="w-full min-h-[120px] rounded-2xl bg-muted/50 border border-border p-4 flex flex-col items-center justify-center">
+            {isListening && (
+              <WaveAnimation isActive={!!interimTranscript} />
+            )}
+            
+            {displayText ? (
+              <p className="mt-3 text-center text-lg font-medium animate-fade-in">
+                "{displayText}"
+              </p>
+            ) : isListening ? (
+              <p className="mt-3 text-center text-sm text-muted-foreground">
+                Speak now...
+              </p>
+            ) : isProcessing ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span>Processing...</span>
+              </div>
+            ) : isSpeaking ? (
+              <div className="flex items-center gap-2 text-primary">
+                <Volume2 className="h-5 w-5 animate-pulse" />
+                <span>Delton is speaking...</span>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Ready</p>
+            )}
+          </div>
+
           {/* Status indicator */}
           <div className="flex items-center gap-2 text-sm">
-            {isProcessing ? (
+            {isListening ? (
+              <span className="flex items-center gap-2 text-emerald-500">
+                <Mic className="h-4 w-4" />
+                Listening
+              </span>
+            ) : isProcessing ? (
               <span className="flex items-center gap-2 text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Thinking...
@@ -399,24 +450,10 @@ export function VoiceConversation({
             ) : isSpeaking ? (
               <span className="flex items-center gap-2 text-primary">
                 <Volume2 className="h-4 w-4 animate-pulse" />
-                Delton is speaking...
+                Speaking
               </span>
-            ) : isListening ? (
-              <span className="flex items-center gap-2 text-emerald-500">
-                <Mic className="h-4 w-4 animate-pulse" />
-                Listening...
-              </span>
-            ) : (
-              <span className="text-muted-foreground">Ready</span>
-            )}
+            ) : null}
           </div>
-
-          {/* Live transcript */}
-          {transcript && (
-            <div className="max-w-xs rounded-lg bg-muted p-3 text-sm">
-              <p className="text-muted-foreground italic">"{transcript}"</p>
-            </div>
-          )}
 
           {/* Voice visualization */}
           <div className={cn(
@@ -452,7 +489,7 @@ export function VoiceConversation({
             variant="destructive"
             size="lg"
             onClick={endConversation}
-            className="mt-4 gap-2"
+            className="mt-2 gap-2"
           >
             <PhoneOff className="h-5 w-5" />
             End Conversation
