@@ -138,17 +138,26 @@ export function useConversations() {
   }, [user, conversations]);
 
   const deleteConversation = useCallback(async (id: string) => {
-    if (!user) return false;
+    if (!user) {
+      console.error('No user found for delete operation');
+      return false;
+    }
     
     try {
+      console.log('Deleting conversation:', id, 'for user:', user.id);
+      
       const { error } = await supabase
         .from('conversations')
         .update({ deleted_at: new Date().toISOString() })
         .eq('id', id)
         .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error deleting conversation:', error);
+        throw error;
+      }
       
+      console.log('Conversation deleted successfully');
       setConversations((prev) => prev.filter((c) => c.id !== id));
       setArchivedConversations((prev) => prev.filter((c) => c.id !== id));
       return true;
