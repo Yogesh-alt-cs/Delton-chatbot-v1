@@ -203,6 +203,7 @@ export type Database = {
           tts_voice_name: string | null
           updated_at: string
           user_id: string
+          voice_language: string | null
         }
         Insert: {
           created_at?: string
@@ -214,6 +215,7 @@ export type Database = {
           tts_voice_name?: string | null
           updated_at?: string
           user_id: string
+          voice_language?: string | null
         }
         Update: {
           created_at?: string
@@ -225,6 +227,7 @@ export type Database = {
           tts_voice_name?: string | null
           updated_at?: string
           user_id?: string
+          voice_language?: string | null
         }
         Relationships: []
       }

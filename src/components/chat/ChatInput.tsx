@@ -5,6 +5,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { VoiceInputButton } from './VoiceInputButton';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -14,7 +16,28 @@ interface ChatInputProps {
 export function ChatInput({ onSend, disabled }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const [interimText, setInterimText] = useState('');
+  const [language, setLanguage] = useState('en-US');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { user } = useAuth();
+
+  // Load user's preferred language
+  useEffect(() => {
+    const loadLanguage = async () => {
+      if (!user) return;
+      
+      const { data } = await supabase
+        .from('user_settings')
+        .select('voice_language')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (data?.voice_language) {
+        setLanguage(data.voice_language);
+      }
+    };
+    
+    loadLanguage();
+  }, [user]);
 
   const { isListening, isSupported, toggleListening } = useVoiceInput({
     onResult: (transcript) => {
@@ -24,6 +47,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
     onInterimResult: (transcript) => {
       setInterimText(transcript);
     },
+    language,
   });
 
   const handleSend = () => {

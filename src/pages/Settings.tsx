@@ -1,4 +1,4 @@
-import { Moon, Sun, Monitor, LogOut, User, Bell, Download, FileText, FileJson, Volume2, Trash2, Sparkles } from 'lucide-react';
+import { Moon, Sun, Monitor, LogOut, User, Bell, Download, FileText, FileJson, Volume2, Trash2, Sparkles, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
@@ -52,6 +52,23 @@ const styleOptions = [
   { value: 'detailed', label: 'Detailed & Thorough' },
 ] as const;
 
+const languageOptions = [
+  { value: 'en-US', label: 'English (US)', flag: '🇺🇸' },
+  { value: 'en-GB', label: 'English (UK)', flag: '🇬🇧' },
+  { value: 'es-ES', label: 'Spanish (Spain)', flag: '🇪🇸' },
+  { value: 'es-MX', label: 'Spanish (Mexico)', flag: '🇲🇽' },
+  { value: 'fr-FR', label: 'French', flag: '🇫🇷' },
+  { value: 'de-DE', label: 'German', flag: '🇩🇪' },
+  { value: 'it-IT', label: 'Italian', flag: '🇮🇹' },
+  { value: 'pt-BR', label: 'Portuguese (Brazil)', flag: '🇧🇷' },
+  { value: 'hi-IN', label: 'Hindi', flag: '🇮🇳' },
+  { value: 'zh-CN', label: 'Chinese (Simplified)', flag: '🇨🇳' },
+  { value: 'ja-JP', label: 'Japanese', flag: '🇯🇵' },
+  { value: 'ko-KR', label: 'Korean', flag: '🇰🇷' },
+  { value: 'ar-SA', label: 'Arabic', flag: '🇸🇦' },
+  { value: 'ru-RU', label: 'Russian', flag: '🇷🇺' },
+] as const;
+
 export default function Settings() {
   const { user, signOut } = useAuth();
   const { settings, updateSettings, clearAllHistory } = useUserSettings();
@@ -68,6 +85,7 @@ export default function Settings() {
   const notificationsEnabled = settings?.notifications_enabled ?? true;
   const currentVoice = settings?.tts_voice_name || 'default';
   const currentStyle = settings?.personalization_style || 'balanced';
+  const currentLanguage = settings?.voice_language || 'en-US';
 
   const handleThemeChange = (theme: 'light' | 'dark' | 'system') => {
     updateSettings({ theme });
@@ -90,6 +108,14 @@ export default function Settings() {
 
   const handleStyleChange = (style: string) => {
     updateSettings({ personalization_style: style });
+  };
+
+  const handleLanguageChange = (language: string) => {
+    updateSettings({ voice_language: language });
+    toast({
+      title: 'Language Updated',
+      description: 'Voice recognition language has been changed.',
+    });
   };
 
   const handleNameSave = () => {
@@ -199,6 +225,33 @@ export default function Settings() {
                 </Select>
               </div>
             </div>
+          </section>
+
+          {/* Voice Language Section */}
+          <section className="rounded-xl border border-border bg-card p-4 space-y-4">
+            <div className="flex items-center gap-3">
+              <Globe className="h-5 w-5 text-muted-foreground" />
+              <h2 className="font-semibold">Voice Recognition Language</h2>
+            </div>
+            
+            <Select value={currentLanguage} onValueChange={handleLanguageChange}>
+              <SelectTrigger className="w-full bg-background">
+                <SelectValue placeholder="Select language" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border border-border z-50 max-h-60">
+                {languageOptions.map((lang) => (
+                  <SelectItem key={lang.value} value={lang.value}>
+                    <span className="flex items-center gap-2">
+                      <span>{lang.flag}</span>
+                      <span>{lang.label}</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Choose the language for voice input recognition
+            </p>
           </section>
 
           {/* Voice Settings Section */}

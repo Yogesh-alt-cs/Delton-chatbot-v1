@@ -11,6 +11,7 @@ export interface UserSettings {
   tts_voice_name: string;
   personalization_name: string | null;
   personalization_style: string;
+  voice_language: string;
   created_at: string;
   updated_at: string;
 }
@@ -55,7 +56,7 @@ export function useUserSettings() {
     fetchSettings();
   }, [fetchSettings]);
 
-  const updateSettings = async (updates: Partial<Pick<UserSettings, 'theme' | 'notifications_enabled' | 'tts_voice_name' | 'personalization_name' | 'personalization_style'>>) => {
+  const updateSettings = async (updates: Partial<Pick<UserSettings, 'theme' | 'notifications_enabled' | 'tts_voice_name' | 'personalization_name' | 'personalization_style' | 'voice_language'>>) => {
     if (!user) return;
 
     try {

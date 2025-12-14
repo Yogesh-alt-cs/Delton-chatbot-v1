@@ -25,7 +25,7 @@ export default function Chat() {
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [mode, setMode] = useState<'text' | 'voice'>('text');
   const [wakeWordEnabled, setWakeWordEnabled] = useState(true);
-  const [personalization, setPersonalization] = useState<{ name: string | null; style: string }>({ name: null, style: 'balanced' });
+  const [personalization, setPersonalization] = useState<{ name: string | null; style: string; language: string }>({ name: null, style: 'balanced', language: 'en-US' });
 
   // Initialize reminders hook for parsing AI responses
   const { parseAndCreateReminder } = useReminders();
@@ -57,7 +57,7 @@ export default function Chat() {
       
       const { data } = await supabase
         .from('user_settings')
-        .select('personalization_name, personalization_style')
+        .select('personalization_name, personalization_style, voice_language')
         .eq('user_id', user.id)
         .maybeSingle();
       
@@ -65,6 +65,7 @@ export default function Chat() {
         setPersonalization({
           name: data.personalization_name,
           style: data.personalization_style || 'balanced',
+          language: data.voice_language || 'en-US',
         });
       }
     };

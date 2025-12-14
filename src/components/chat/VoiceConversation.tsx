@@ -53,7 +53,7 @@ interface VoiceConversationProps {
   onMessage?: (role: 'user' | 'assistant', content: string) => void;
   onSaveMessage?: (role: 'user' | 'assistant', content: string) => void;
   conversationId?: string;
-  personalization?: { name: string | null; style: string };
+  personalization?: { name: string | null; style: string; language?: string };
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
@@ -62,7 +62,7 @@ export function VoiceConversation({
   onMessage, 
   onSaveMessage,
   conversationId,
-  personalization = { name: null, style: 'balanced' }
+  personalization = { name: null, style: 'balanced', language: 'en-US' }
 }: VoiceConversationProps) {
   const [isActive, setIsActive] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -234,7 +234,7 @@ export function VoiceConversation({
     const recognition: ISpeechRecognition = new SpeechRecognitionClass();
     recognition.continuous = false; // Changed to false for better reliability
     recognition.interimResults = true;
-    recognition.lang = 'en-US';
+    recognition.lang = personalization.language || 'en-US';
 
     let finalTranscript = '';
 
