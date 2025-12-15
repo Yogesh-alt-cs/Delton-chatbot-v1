@@ -193,12 +193,12 @@ export function useChat(options: UseChatOptions = {}) {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         if (response.status === 429) {
-          throw new Error('Rate limit exceeded. Please wait a moment and try again.');
+          throw new Error('Delton is a bit busy right now. Please wait a moment and try again.');
         }
         if (response.status === 402) {
-          throw new Error('AI credits exhausted. Please add credits to continue.');
+          throw new Error('Delton is taking a break. Please try again later.');
         }
-        throw new Error(errorData.error || `Request failed. Please try again.`);
+        throw new Error(errorData.error || `Something went wrong. Please try again.`);
       }
 
       if (!response.body) {

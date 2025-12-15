@@ -174,7 +174,11 @@ export function VoiceConversation({
       });
 
       if (!response.ok) {
-        throw new Error('AI request failed');
+        const errorData = await response.json().catch(() => ({}));
+        if (response.status === 402) {
+          throw new Error('Delton is taking a break. Please try again later.');
+        }
+        throw new Error(errorData.error || 'Something went wrong. Please try again.');
       }
 
       if (!response.body) {

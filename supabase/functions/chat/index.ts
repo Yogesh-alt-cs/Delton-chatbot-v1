@@ -105,7 +105,7 @@ When you don't know something, you say so honestly. Always be helpful and provid
       
       if (response.status === 429) {
         return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
+          JSON.stringify({ error: "Delton is a bit busy. Please wait a moment and try again." }),
           {
             status: 429,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -115,7 +115,7 @@ When you don't know something, you say so honestly. Always be helpful and provid
       
       if (response.status === 402) {
         return new Response(
-          JSON.stringify({ error: "AI credits exhausted. Please add credits to continue." }),
+          JSON.stringify({ error: "Delton is taking a break. Please try again later." }),
           {
             status: 402,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -123,7 +123,7 @@ When you don't know something, you say so honestly. Always be helpful and provid
         );
       }
       
-      throw new Error(`AI gateway error: ${response.status}`);
+      throw new Error(`Something went wrong. Please try again.`);
     }
 
     console.log("Streaming response started");
