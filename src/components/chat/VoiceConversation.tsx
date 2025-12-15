@@ -54,6 +54,7 @@ interface VoiceConversationProps {
   onSaveMessage?: (role: 'user' | 'assistant', content: string) => void;
   conversationId?: string;
   personalization?: { name: string | null; style: string; language?: string };
+  onMicStateChange?: (isActive: boolean) => void;
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
@@ -83,7 +84,8 @@ export function VoiceConversation({
   onMessage, 
   onSaveMessage,
   conversationId,
-  personalization = { name: null, style: 'balanced', language: 'en-US' }
+  personalization = { name: null, style: 'balanced', language: 'en-US' },
+  onMicStateChange
 }: VoiceConversationProps) {
   const [isActive, setIsActive] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -102,6 +104,11 @@ export function VoiceConversation({
     const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     setIsSupported(!!SpeechRecognitionClass && 'speechSynthesis' in window);
   }, []);
+
+  // Notify parent of mic state changes
+  useEffect(() => {
+    onMicStateChange?.(isListening);
+  }, [isListening, onMicStateChange]);
 
   const speakText = useCallback((text: string): Promise<void> => {
     return new Promise((resolve) => {

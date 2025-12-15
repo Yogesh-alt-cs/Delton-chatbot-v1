@@ -11,9 +11,10 @@ import { useAuth } from '@/contexts/AuthContext';
 interface ChatInputProps {
   onSend: (message: string) => void;
   disabled?: boolean;
+  onMicStateChange?: (isActive: boolean) => void;
 }
 
-export function ChatInput({ onSend, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const [interimText, setInterimText] = useState('');
   const [language, setLanguage] = useState('en-US');
@@ -49,6 +50,11 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
     },
     language,
   });
+
+  // Notify parent of mic state changes
+  useEffect(() => {
+    onMicStateChange?.(isListening);
+  }, [isListening, onMicStateChange]);
 
   const handleSend = () => {
     const trimmed = message.trim();
