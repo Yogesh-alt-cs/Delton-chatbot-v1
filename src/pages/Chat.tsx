@@ -7,6 +7,7 @@ import { MessageBubble } from '@/components/chat/MessageBubble';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { VoiceConversation } from '@/components/chat/VoiceConversation';
+import { MicIndicator } from '@/components/chat/MicIndicator';
 import { useChat } from '@/hooks/useChat';
 import { useFeedback } from '@/hooks/useFeedback';
 import { useReminders } from '@/hooks/useReminders';
@@ -22,6 +23,7 @@ export default function Chat() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [mode, setMode] = useState<'text' | 'voice'>('text');
+  const [isMicActive, setIsMicActive] = useState(false);
   const [personalization, setPersonalization] = useState<{ name: string | null; style: string; language: string }>({ name: null, style: 'balanced', language: 'en-US' });
 
   // Initialize reminders hook for parsing AI responses
@@ -110,6 +112,7 @@ export default function Chat() {
 
   return (
     <AppLayout>
+      <MicIndicator isActive={isMicActive} />
       <div className="flex h-[calc(100vh-4rem)] flex-col">
         {/* Header */}
         <header className="flex h-14 items-center justify-between border-b border-border px-4 safe-top">
@@ -160,6 +163,7 @@ export default function Chat() {
             <VoiceConversation
               conversationId={conversationId}
               personalization={personalization}
+              onMicStateChange={setIsMicActive}
               onMessage={(role, content) => {
                 // Messages are handled internally in VoiceConversation
                 console.log(`${role}: ${content}`);
@@ -227,7 +231,7 @@ export default function Chat() {
             </div>
 
             {/* Input Area */}
-            <ChatInput onSend={sendMessage} disabled={isLoading} />
+            <ChatInput onSend={sendMessage} disabled={isLoading} onMicStateChange={setIsMicActive} />
           </>
         )}
       </div>
