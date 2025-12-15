@@ -77,13 +77,6 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
 
     // Stop any existing recognition first
     stopListening();
-
-    // Request permission first
-    if (hasPermission !== true) {
-      const granted = await requestPermission();
-      if (!granted) return;
-    }
-
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     
@@ -127,20 +120,22 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
 
     recognition.onerror = (event: SpeechRecognitionError) => {
       console.error('Speech recognition error:', event.error);
-      
-      if (event.error === 'not-allowed') {
+
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
         setHasPermission(false);
         setIsListening(false);
         toast.error('Microphone access denied.');
+      } else if (event.error === 'audio-capture') {
+        setIsListening(false);
+        toast.error('Microphone is busy. Close other apps using the mic and try again.');
       } else if (event.error === 'network') {
         setIsListening(false);
         toast.error('Network error. Please check your connection.');
       } else if (event.error === 'no-speech') {
-        // This is common, don't show error, just restart if continuous
+        // This is common, don't show error
         console.log('No speech detected, waiting...');
       } else if (event.error !== 'aborted') {
-        // For other errors, we can try to restart
-        console.log('Voice error, will retry:', event.error);
+        console.log('Voice error:', event.error);
       }
     };
 

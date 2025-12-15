@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 // Web Speech API types
 interface SpeechRecognitionEvent extends Event {
   results: SpeechRecognitionResultList;
+  resultIndex: number;
 }
 
 interface SpeechRecognitionResultList {
@@ -274,7 +275,7 @@ export function VoiceConversation({
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interim = '';
       
-      for (let i = 0; i < event.results.length; i++) {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         if (result.isFinal) {
           finalTranscript += result[0].transcript;
@@ -313,13 +314,21 @@ export function VoiceConversation({
         }
       } else if (event.error === 'aborted') {
         console.log('Recognition aborted');
+      } else if (event.error === 'audio-capture') {
+        toast({
+          title: 'Microphone Busy',
+          description: 'Another app or feature is using your microphone. Close it and try again.',
+          variant: 'destructive',
+        });
+        shouldRestartRef.current = false;
+        setIsActive(false);
       } else if (event.error === 'network') {
         toast({
           title: 'Network Error',
           description: 'Please check your internet connection.',
           variant: 'destructive',
         });
-      } else if (event.error === 'not-allowed') {
+      } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
         toast({
           title: 'Microphone Blocked',
           description: 'Please allow microphone access in your browser.',
@@ -375,26 +384,12 @@ export function VoiceConversation({
     setInterimTranscript('');
   }, []);
 
-  const startConversation = useCallback(async () => {
-    try {
-      // Request microphone permission
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(track => track.stop());
-      
-      setIsActive(true);
-      shouldRestartRef.current = true;
-      
-      // Start listening immediately without welcome message
-      startListening();
-    } catch (error) {
-      console.error('Microphone access error:', error);
-      toast({
-        title: 'Microphone Required',
-        description: 'Please allow microphone access for voice conversation.',
-        variant: 'destructive',
-      });
-    }
-  }, [startListening, toast]);
+  const startConversation = useCallback(() => {
+    setIsActive(true);
+    shouldRestartRef.current = true;
+    // Start immediately (avoids losing the user-gesture context on some browsers)
+    startListening();
+  }, [startListening]);
 
   const endConversation = useCallback(() => {
     shouldRestartRef.current = false;
@@ -408,7 +403,13 @@ export function VoiceConversation({
   }, [stopListening]);
 
   if (!isSupported) {
-    return null;
+    return (
+      <div className="w-full max-w-md rounded-2xl border border-border bg-muted/30 p-4 text-center">
+        <p className="text-sm text-muted-foreground">
+          Voice mode isn’t supported in this browser. Please try Chrome (Android/Desktop).
+        </p>
+      </div>
+    );
   }
 
   const displayText = interimTranscript || transcript;
