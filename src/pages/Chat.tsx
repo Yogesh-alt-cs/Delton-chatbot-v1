@@ -11,9 +11,11 @@ import { MicIndicator } from '@/components/chat/MicIndicator';
 import { useChat } from '@/hooks/useChat';
 import { useFeedback } from '@/hooks/useFeedback';
 import { useReminders } from '@/hooks/useReminders';
+import { useDailyLimit } from '@/hooks/useDailyLimit';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Chat() {
   const navigate = useNavigate();
@@ -28,6 +30,8 @@ export default function Chat() {
 
   // Initialize reminders hook for parsing AI responses
   const { parseAndCreateReminder } = useReminders();
+  const { remainingChats, isLimitReached, incrementUsage, DAILY_LIMIT } = useDailyLimit();
+  const { toast } = useToast();
 
   const { messages, isLoading, conversationId, sendMessage, loadConversation, clearChat } = useChat({
     conversationId: urlConversationId,
@@ -37,6 +41,30 @@ export default function Chat() {
   });
 
   const { feedbackMap, loadFeedback, toggleFeedback } = useFeedback();
+
+  // Wrapped send with daily limit check
+  const handleSendMessage = useCallback(async (content: string) => {
+    if (isLimitReached) {
+      toast({
+        title: "Daily limit reached",
+        description: `You've used all ${DAILY_LIMIT} chats for today. Your limit resets at midnight.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const canProceed = await incrementUsage();
+    if (!canProceed) {
+      toast({
+        title: "Daily limit reached",
+        description: `You've used all ${DAILY_LIMIT} chats for today. Your limit resets at midnight.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    await sendMessage(content);
+  }, [isLimitReached, incrementUsage, sendMessage, toast, DAILY_LIMIT]);
 
   // Load personalization
   useEffect(() => {
@@ -231,7 +259,7 @@ export default function Chat() {
             </div>
 
             {/* Input Area */}
-            <ChatInput onSend={sendMessage} disabled={isLoading} onMicStateChange={setIsMicActive} />
+            <ChatInput onSend={handleSendMessage} disabled={isLoading || isLimitReached} onMicStateChange={setIsMicActive} />
           </>
         )}
       </div>
