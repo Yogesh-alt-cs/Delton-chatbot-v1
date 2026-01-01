@@ -19,3 +19,6 @@ api_url = "http://127.0.0.1"
 
 [functions.chat]
 verify_jwt = false
+
+[functions.firecrawl-scrape]
+verify_jwt = false
