@@ -5,6 +5,7 @@ import { Message, Conversation } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
+const FIRECRAWL_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/firecrawl-scrape`;
 
 interface UseChatOptions {
   conversationId?: string;
@@ -122,6 +123,40 @@ export function useChat(options: UseChatOptions = {}) {
     }
   }, []);
 
+  // Extract URLs from text
+  const extractUrls = useCallback((text: string): string[] => {
+    const urlRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
+    return text.match(urlRegex) || [];
+  }, []);
+
+  // Scrape URL content
+  const scrapeUrl = useCallback(async (url: string): Promise<string | null> => {
+    try {
+      const response = await fetch(FIRECRAWL_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ url }),
+      });
+
+      if (!response.ok) return null;
+
+      const data = await response.json();
+      if (data?.success && data?.data?.markdown) {
+        const title = data.data.metadata?.title || url;
+        // Truncate content to avoid token limits (first 4000 chars)
+        const content = data.data.markdown.slice(0, 4000);
+        return `\n\n---\n📄 **Content from: ${title}**\n${content}\n---\n`;
+      }
+      return null;
+    } catch (err) {
+      console.error('URL scrape error:', err);
+      return null;
+    }
+  }, []);
+
   const sendMessage = useCallback(async (content: string) => {
     if (!user || isLoading) return;
 
@@ -138,7 +173,19 @@ export function useChat(options: UseChatOptions = {}) {
         }
       }
 
-      // Add user message to UI immediately
+      // Check for URLs and scrape content
+      const urls = extractUrls(content);
+      let enrichedContent = content;
+      
+      if (urls.length > 0) {
+        // Scrape first URL found (to keep response times reasonable)
+        const scrapedContent = await scrapeUrl(urls[0]);
+        if (scrapedContent) {
+          enrichedContent = content + scrapedContent;
+        }
+      }
+
+      // Add user message to UI immediately (show original content)
       const userMessage: Message = {
         id: crypto.randomUUID(),
         conversation_id: currentConvId,
@@ -151,15 +198,17 @@ export function useChat(options: UseChatOptions = {}) {
       // Save user message to database
       await saveMessage(currentConvId, 'user', content);
 
-      // Prepare messages for AI (excluding system messages from history)
+      // Prepare messages for AI (use enriched content for the current message)
       const chatMessages = [
         // Add personalization as system messages
         ...(personalization.name ? [{ role: 'system' as const, content: `USER_NAME:${personalization.name}` }] : []),
         { role: 'system' as const, content: `USER_STYLE:${personalization.style}` },
-        // Add conversation messages
-        ...[...messages, userMessage]
+        // Add conversation messages (use original content for history, enriched for current)
+        ...messages
           .filter(m => m.role !== 'system')
           .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+        // Add current message with any scraped URL content
+        { role: 'user' as const, content: enrichedContent },
       ];
 
       // Stream AI response with timeout
