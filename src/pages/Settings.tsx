@@ -412,10 +412,10 @@ export default function Settings() {
           {/* App Info */}
           <div className="pt-4 text-center">
             <p className="text-sm text-muted-foreground">
-              Delton Chatbot v1.0.0
+              Delton 2.0
             </p>
             <p className="text-xs text-muted-foreground">
-              Powered by Lovable AI
+              Created by Yogesh GR
             </p>
           </div>
         </div>

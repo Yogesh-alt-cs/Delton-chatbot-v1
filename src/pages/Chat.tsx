@@ -43,7 +43,7 @@ export default function Chat() {
   const { feedbackMap, loadFeedback, toggleFeedback } = useFeedback();
 
   // Wrapped send with daily limit check
-  const handleSendMessage = useCallback(async (content: string) => {
+  const handleSendMessage = useCallback(async (content: string, images?: import('@/lib/types').MessageImage[]) => {
     if (isLimitReached) {
       toast({
         title: "Daily limit reached",
@@ -63,7 +63,7 @@ export default function Chat() {
       return;
     }
 
-    await sendMessage(content);
+    await sendMessage(content, images);
   }, [isLimitReached, incrementUsage, sendMessage, toast, DAILY_LIMIT]);
 
   // Load personalization
@@ -228,6 +228,7 @@ export default function Chat() {
                       id={message.id}
                       role={message.role as 'user' | 'assistant'}
                       content={message.content}
+                      images={message.images}
                       isStreaming={
                         isLastMessageStreaming && 
                         index === messages.length - 1

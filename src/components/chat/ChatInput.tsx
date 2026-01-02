@@ -5,11 +5,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { VoiceInputButton } from './VoiceInputButton';
+import { ImageUploadButton } from './ImageUploadButton';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { MessageImage } from '@/lib/types';
 
 interface ChatInputProps {
-  onSend: (message: string) => void;
+  onSend: (message: string, images?: MessageImage[]) => void;
   disabled?: boolean;
   onMicStateChange?: (isActive: boolean) => void;
 }
@@ -18,6 +20,7 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
   const [message, setMessage] = useState('');
   const [interimText, setInterimText] = useState('');
   const [language, setLanguage] = useState('en-US');
+  const [images, setImages] = useState<MessageImage[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { user } = useAuth();
 
@@ -58,11 +61,12 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
 
   const handleSend = () => {
     const trimmed = message.trim();
-    if (!trimmed || disabled) return;
+    if ((!trimmed && images.length === 0) || disabled) return;
     
-    onSend(trimmed);
+    onSend(trimmed || 'What do you see in this image?', images.length > 0 ? images : undefined);
     setMessage('');
     setInterimText('');
+    setImages([]);
     
     // Reset textarea height
     if (textareaRef.current) {
@@ -90,7 +94,36 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
 
   return (
     <div className="border-t border-border bg-background p-4">
+      {/* Image previews */}
+      {images.length > 0 && (
+        <div className="flex gap-2 flex-wrap mb-3">
+          {images.map((image, index) => (
+            <div 
+              key={index} 
+              className="relative w-16 h-16 rounded-lg overflow-hidden border border-border"
+            >
+              <img 
+                src={image.url} 
+                alt={`Upload ${index + 1}`}
+                className="w-full h-full object-cover"
+              />
+              <button
+                onClick={() => setImages(images.filter((_, i) => i !== index))}
+                className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-background/80 hover:bg-background text-foreground"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      
       <div className="flex items-end gap-2">
+        <ImageUploadButton
+          images={images}
+          onImagesChange={setImages}
+          disabled={disabled}
+        />
         <VoiceInputButton
           isListening={isListening}
           isSupported={isSupported}
@@ -106,7 +139,7 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
           }}
           onKeyDown={handleKeyDown}
           onInput={handleInput}
-          placeholder={isListening ? "Listening..." : "Type a message..."}
+          placeholder={isListening ? "Listening..." : images.length > 0 ? "Ask about the image..." : "Type a message..."}
           className={cn(
             "min-h-[44px] max-h-32 resize-none rounded-xl",
             isListening && "border-primary"
@@ -118,9 +151,9 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
           size="icon"
           className={cn(
             "h-11 w-11 shrink-0 rounded-xl transition-all",
-            (!message.trim() || disabled) && "opacity-50"
+            ((!message.trim() && images.length === 0) || disabled) && "opacity-50"
           )}
-          disabled={!message.trim() || disabled}
+          disabled={(!message.trim() && images.length === 0) || disabled}
           onClick={handleSend}
         >
           <Send className="h-5 w-5" />
