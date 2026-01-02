@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Message, Conversation } from '@/lib/types';
+import { Message, Conversation, MessageImage } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import { needsLiveSearch, searchWeb, formatSearchResults } from '@/hooks/useWebSearch';
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 const FIRECRAWL_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/firecrawl-scrape`;
@@ -157,7 +158,7 @@ export function useChat(options: UseChatOptions = {}) {
     }
   }, []);
 
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, images?: MessageImage[]) => {
     if (!user || isLoading) return;
 
     setIsLoading(true);
@@ -185,6 +186,16 @@ export function useChat(options: UseChatOptions = {}) {
         }
       }
 
+      // Check if we need autonomous live web search
+      if (needsLiveSearch(content)) {
+        console.log('Triggering autonomous web search for:', content);
+        const searchResult = await searchWeb(content, 5);
+        if (searchResult.success && searchResult.data && searchResult.data.length > 0) {
+          const formattedResults = formatSearchResults(searchResult.data);
+          enrichedContent = enrichedContent + formattedResults;
+        }
+      }
+
       // Add user message to UI immediately (show original content)
       const userMessage: Message = {
         id: crypto.randomUUID(),
@@ -192,6 +203,7 @@ export function useChat(options: UseChatOptions = {}) {
         role: 'user',
         content,
         created_at: new Date().toISOString(),
+        images,
       };
       setMessages((prev) => [...prev, userMessage]);
 
@@ -199,16 +211,39 @@ export function useChat(options: UseChatOptions = {}) {
       await saveMessage(currentConvId, 'user', content);
 
       // Prepare messages for AI (use enriched content for the current message)
+      // Format message content for vision support
+      const formatMessageContent = (text: string, messageImages?: MessageImage[]) => {
+        if (!messageImages || messageImages.length === 0) {
+          return text;
+        }
+        
+        // For messages with images, use multimodal format
+        const parts: any[] = [{ type: 'text', text }];
+        
+        for (const img of messageImages) {
+          if (img.base64) {
+            parts.push({
+              type: 'image_url',
+              image_url: {
+                url: `data:${img.mimeType};base64,${img.base64}`,
+              },
+            });
+          }
+        }
+        
+        return parts;
+      };
+
       const chatMessages = [
         // Add personalization as system messages
         ...(personalization.name ? [{ role: 'system' as const, content: `USER_NAME:${personalization.name}` }] : []),
         { role: 'system' as const, content: `USER_STYLE:${personalization.style}` },
-        // Add conversation messages (use original content for history, enriched for current)
+        // Add conversation messages (use original content for history)
         ...messages
           .filter(m => m.role !== 'system')
           .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-        // Add current message with any scraped URL content
-        { role: 'user' as const, content: enrichedContent },
+        // Add current message with images if present
+        { role: 'user' as const, content: formatMessageContent(enrichedContent, images) },
       ];
 
       // Stream AI response with timeout
