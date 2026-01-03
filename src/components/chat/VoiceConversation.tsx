@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Mic, MicOff, Volume2, VolumeX, Loader2, Phone, PhoneOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
+import { useElevenLabsTTS } from '@/hooks/useElevenLabsTTS';
 
 // Web Speech API types
 interface SpeechRecognitionEvent extends Event {
@@ -60,7 +60,6 @@ interface VoiceConversationProps {
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
-// Wave animation component
 function WaveAnimation({ isActive }: { isActive: boolean }) {
   return (
     <div className="flex items-center justify-center gap-1 h-8">
@@ -90,7 +89,6 @@ export function VoiceConversation({
 }: VoiceConversationProps) {
   const [isActive, setIsActive] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -100,23 +98,26 @@ export function VoiceConversation({
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const shouldRestartRef = useRef(false);
   const { toast } = useToast();
+  
+  // Use ElevenLabs TTS
+  const { speak: elevenLabsSpeak, stop: stopSpeaking, isSpeaking, isLoading: ttsLoading } = useElevenLabsTTS();
 
   useEffect(() => {
     const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    setIsSupported(!!SpeechRecognitionClass && 'speechSynthesis' in window);
+    setIsSupported(!!SpeechRecognitionClass);
   }, []);
 
-  // Notify parent of mic state changes
   useEffect(() => {
     onMicStateChange?.(isListening);
   }, [isListening, onMicStateChange]);
 
-  const speakText = useCallback((text: string): Promise<void> => {
-    return new Promise((resolve) => {
-      if (!('speechSynthesis' in window)) {
-        resolve();
-        return;
-      }
+  const speakText = useCallback(async (text: string): Promise<void> => {
+    // Try ElevenLabs first, fall back to Web Speech API
+    const success = await elevenLabsSpeak(text);
+    
+    if (!success) {
+      // Fallback to Web Speech API
+      if (!('speechSynthesis' in window)) return;
       
       speechSynthesis.cancel();
       
@@ -125,7 +126,6 @@ export function VoiceConversation({
       utterance.pitch = 1;
       utterance.volume = 1;
       
-      // Try to get a good voice
       const voices = speechSynthesis.getVoices();
       const englishVoice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) 
         || voices.find(v => v.lang.startsWith('en'));
@@ -133,19 +133,13 @@ export function VoiceConversation({
         utterance.voice = englishVoice;
       }
       
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => {
-        setIsSpeaking(false);
-        resolve();
-      };
-      utterance.onerror = () => {
-        setIsSpeaking(false);
-        resolve();
-      };
-      
-      speechSynthesis.speak(utterance);
-    });
-  }, []);
+      return new Promise((resolve) => {
+        utterance.onend = () => resolve();
+        utterance.onerror = () => resolve();
+        speechSynthesis.speak(utterance);
+      });
+    }
+  }, [elevenLabsSpeak]);
 
   const sendToAI = useCallback(async (userMessage: string) => {
     setIsProcessing(true);
@@ -227,7 +221,7 @@ export function VoiceConversation({
         onMessage?.('assistant', assistantContent);
         onSaveMessage?.('assistant', assistantContent);
         
-        // Speak the response
+        // Speak using ElevenLabs
         await speakText(assistantContent);
       }
     } catch (error) {
@@ -255,7 +249,6 @@ export function VoiceConversation({
       return;
     }
 
-    // Stop any existing recognition first
     if (recognitionRef.current) {
       try {
         recognitionRef.current.abort();
@@ -284,10 +277,8 @@ export function VoiceConversation({
         }
       }
       
-      // Show real-time interim results
       setInterimTranscript(interim);
       
-      // Process final result
       if (finalTranscript.trim()) {
         console.log('Final transcript:', finalTranscript.trim());
         setTranscript(finalTranscript.trim());
@@ -387,26 +378,24 @@ export function VoiceConversation({
   const startConversation = useCallback(() => {
     setIsActive(true);
     shouldRestartRef.current = true;
-    // Start immediately (avoids losing the user-gesture context on some browsers)
     startListening();
   }, [startListening]);
 
   const endConversation = useCallback(() => {
     shouldRestartRef.current = false;
     stopListening();
-    speechSynthesis.cancel();
+    stopSpeaking();
     setIsActive(false);
-    setIsSpeaking(false);
     setMessages([]);
     setTranscript('');
     setInterimTranscript('');
-  }, [stopListening]);
+  }, [stopListening, stopSpeaking]);
 
   if (!isSupported) {
     return (
       <div className="w-full max-w-md rounded-2xl border border-border bg-muted/30 p-4 text-center">
         <p className="text-sm text-muted-foreground">
-          Voice mode isn’t supported in this browser. Please try Chrome (Android/Desktop).
+          Voice mode isn't supported in this browser. Please try Chrome (Android/Desktop).
         </p>
       </div>
     );
@@ -418,7 +407,6 @@ export function VoiceConversation({
     <div className="flex flex-col items-center gap-6 w-full max-w-md">
       {isActive ? (
         <>
-          {/* Real-time transcription display */}
           <div className="w-full min-h-[120px] rounded-2xl bg-muted/50 border border-border p-4 flex flex-col items-center justify-center">
             {isListening && (
               <WaveAnimation isActive={!!interimTranscript} />
@@ -432,7 +420,7 @@ export function VoiceConversation({
               <p className="mt-3 text-center text-sm text-muted-foreground">
                 Speak now...
               </p>
-            ) : isProcessing ? (
+            ) : isProcessing || ttsLoading ? (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin" />
                 <span>Processing...</span>
@@ -447,14 +435,13 @@ export function VoiceConversation({
             )}
           </div>
 
-          {/* Status indicator */}
           <div className="flex items-center gap-2 text-sm">
             {isListening ? (
               <span className="flex items-center gap-2 text-emerald-500">
                 <Mic className="h-4 w-4" />
                 Listening
               </span>
-            ) : isProcessing ? (
+            ) : isProcessing || ttsLoading ? (
               <span className="flex items-center gap-2 text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Thinking...
@@ -462,17 +449,16 @@ export function VoiceConversation({
             ) : isSpeaking ? (
               <span className="flex items-center gap-2 text-primary">
                 <Volume2 className="h-4 w-4 animate-pulse" />
-                Speaking
+                Speaking (ElevenLabs)
               </span>
             ) : null}
           </div>
 
-          {/* Voice visualization */}
           <div className={cn(
             "relative flex h-24 w-24 items-center justify-center rounded-full transition-all duration-300",
             isListening && "bg-emerald-500/20",
             isSpeaking && "bg-primary/20",
-            isProcessing && "bg-muted"
+            (isProcessing || ttsLoading) && "bg-muted"
           )}>
             <div className={cn(
               "absolute inset-0 rounded-full transition-all duration-300",
@@ -483,10 +469,10 @@ export function VoiceConversation({
               "relative flex h-16 w-16 items-center justify-center rounded-full",
               isListening && "bg-emerald-500",
               isSpeaking && "bg-primary",
-              isProcessing && "bg-muted-foreground",
-              !isListening && !isSpeaking && !isProcessing && "bg-muted-foreground/50"
+              (isProcessing || ttsLoading) && "bg-muted-foreground",
+              !isListening && !isSpeaking && !isProcessing && !ttsLoading && "bg-muted-foreground/50"
             )}>
-              {isProcessing ? (
+              {isProcessing || ttsLoading ? (
                 <Loader2 className="h-8 w-8 animate-spin text-background" />
               ) : isSpeaking ? (
                 <Volume2 className="h-8 w-8 text-background" />
@@ -496,27 +482,34 @@ export function VoiceConversation({
             </div>
           </div>
 
-          {/* End call button */}
           <Button
-            variant="destructive"
             size="lg"
+            variant="destructive"
             onClick={endConversation}
-            className="mt-2 gap-2"
+            className="rounded-full px-8"
           >
-            <PhoneOff className="h-5 w-5" />
+            <PhoneOff className="h-5 w-5 mr-2" />
             End Conversation
           </Button>
         </>
       ) : (
-        <Button
-          variant="default"
-          size="lg"
-          onClick={startConversation}
-          className="gap-2 bg-emerald-500 hover:bg-emerald-600"
-        >
-          <Phone className="h-5 w-5" />
-          Start Voice Chat
-        </Button>
+        <>
+          <div className="text-center space-y-2">
+            <h3 className="text-lg font-semibold">Voice Mode</h3>
+            <p className="text-sm text-muted-foreground">
+              Have a conversation with Delton using your voice (powered by ElevenLabs)
+            </p>
+          </div>
+
+          <Button
+            size="lg"
+            onClick={startConversation}
+            className="rounded-full px-8 bg-emerald-500 hover:bg-emerald-600"
+          >
+            <Phone className="h-5 w-5 mr-2" />
+            Start Conversation
+          </Button>
+        </>
       )}
     </div>
   );

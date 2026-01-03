@@ -3,7 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Message, Conversation, MessageImage } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { needsLiveSearch, searchWeb, formatSearchResults } from '@/hooks/useWebSearch';
+import { useLongTermMemory } from '@/hooks/useLongTermMemory';
+import { usePerplexitySearch } from '@/hooks/usePerplexitySearch';
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 const FIRECRAWL_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/firecrawl-scrape`;
@@ -13,6 +14,21 @@ interface UseChatOptions {
   onConversationCreated?: (conversation: Conversation) => void;
 }
 
+// Check if a query needs live search
+function needsLiveSearch(query: string): boolean {
+  const lowerQuery = query.toLowerCase();
+  
+  const liveKeywords = [
+    'latest', 'current', 'today', 'now', 'recent', 'news',
+    'price', 'stock', 'weather', 'score', 'match', 'game',
+    'what is happening', 'what happened', 'breaking',
+    'trending', 'update', 'live', 'real-time', 'realtime',
+    '2025', '2026', 'this week', 'this month', 'yesterday',
+  ];
+  
+  return liveKeywords.some(keyword => lowerQuery.includes(keyword));
+}
+
 export function useChat(options: UseChatOptions = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -20,6 +36,8 @@ export function useChat(options: UseChatOptions = {}) {
   const [personalization, setPersonalization] = useState<{ name: string | null; style: string }>({ name: null, style: 'balanced' });
   const { user } = useAuth();
   const { toast } = useToast();
+  const { getMemoryContext, extractAndStoreMemories } = useLongTermMemory();
+  const { search: perplexitySearch, formatForContext: formatPerplexityResults } = usePerplexitySearch();
 
   // Load personalization settings
   useEffect(() => {
@@ -69,7 +87,6 @@ export function useChat(options: UseChatOptions = {}) {
     if (!user) return null;
 
     try {
-      // Generate title from first message (first 50 chars)
       const title = firstMessage.length > 50 
         ? firstMessage.substring(0, 50) + '...' 
         : firstMessage;
@@ -124,13 +141,11 @@ export function useChat(options: UseChatOptions = {}) {
     }
   }, []);
 
-  // Extract URLs from text
   const extractUrls = useCallback((text: string): string[] => {
     const urlRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
     return text.match(urlRegex) || [];
   }, []);
 
-  // Scrape URL content
   const scrapeUrl = useCallback(async (url: string): Promise<string | null> => {
     try {
       const response = await fetch(FIRECRAWL_URL, {
@@ -147,7 +162,6 @@ export function useChat(options: UseChatOptions = {}) {
       const data = await response.json();
       if (data?.success && data?.data?.markdown) {
         const title = data.data.metadata?.title || url;
-        // Truncate content to avoid token limits (first 4000 chars)
         const content = data.data.markdown.slice(0, 4000);
         return `\n\n---\n📄 **Content from: ${title}**\n${content}\n---\n`;
       }
@@ -165,7 +179,6 @@ export function useChat(options: UseChatOptions = {}) {
     let currentConvId = conversationId;
 
     try {
-      // Create conversation if needed
       if (!currentConvId) {
         currentConvId = await createConversation(content);
         if (!currentConvId) {
@@ -179,24 +192,29 @@ export function useChat(options: UseChatOptions = {}) {
       let enrichedContent = content;
       
       if (urls.length > 0) {
-        // Scrape first URL found (to keep response times reasonable)
         const scrapedContent = await scrapeUrl(urls[0]);
         if (scrapedContent) {
           enrichedContent = content + scrapedContent;
         }
       }
 
-      // Check if we need autonomous live web search
+      // Check if we need autonomous live web search (Perplexity)
       if (needsLiveSearch(content)) {
-        console.log('Triggering autonomous web search for:', content);
-        const searchResult = await searchWeb(content, 5);
-        if (searchResult.success && searchResult.data && searchResult.data.length > 0) {
-          const formattedResults = formatSearchResults(searchResult.data);
+        console.log('Triggering Perplexity search for:', content);
+        const searchResult = await perplexitySearch(content);
+        if (searchResult) {
+          const formattedResults = formatPerplexityResults(searchResult);
           enrichedContent = enrichedContent + formattedResults;
         }
       }
 
-      // Add user message to UI immediately (show original content)
+      // Get long-term memory context
+      const memoryContext = await getMemoryContext();
+      if (memoryContext) {
+        enrichedContent = enrichedContent + memoryContext;
+      }
+
+      // Add user message to UI immediately
       const userMessage: Message = {
         id: crypto.randomUUID(),
         conversation_id: currentConvId,
@@ -207,17 +225,14 @@ export function useChat(options: UseChatOptions = {}) {
       };
       setMessages((prev) => [...prev, userMessage]);
 
-      // Save user message to database
       await saveMessage(currentConvId, 'user', content);
 
-      // Prepare messages for AI (use enriched content for the current message)
       // Format message content for vision support
       const formatMessageContent = (text: string, messageImages?: MessageImage[]) => {
         if (!messageImages || messageImages.length === 0) {
           return text;
         }
         
-        // For messages with images, use multimodal format
         const parts: any[] = [{ type: 'text', text }];
         
         for (const img of messageImages) {
@@ -235,20 +250,16 @@ export function useChat(options: UseChatOptions = {}) {
       };
 
       const chatMessages = [
-        // Add personalization as system messages
         ...(personalization.name ? [{ role: 'system' as const, content: `USER_NAME:${personalization.name}` }] : []),
         { role: 'system' as const, content: `USER_STYLE:${personalization.style}` },
-        // Add conversation messages (use original content for history)
         ...messages
           .filter(m => m.role !== 'system')
           .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-        // Add current message with images if present
         { role: 'user' as const, content: formatMessageContent(enrichedContent, images) },
       ];
 
-      // Stream AI response with timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
 
       let response: Response;
       try {
@@ -289,13 +300,11 @@ export function useChat(options: UseChatOptions = {}) {
         throw new Error('No response received. Please try again.');
       }
 
-      // Stream the response
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let assistantContent = '';
       let textBuffer = '';
 
-      // Add empty assistant message
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
         conversation_id: currentConvId,
@@ -312,7 +321,6 @@ export function useChat(options: UseChatOptions = {}) {
 
           textBuffer += decoder.decode(value, { stream: true });
 
-          // Process line by line
           let newlineIndex: number;
           while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
             let line = textBuffer.slice(0, newlineIndex);
@@ -340,14 +348,12 @@ export function useChat(options: UseChatOptions = {}) {
                 });
               }
             } catch {
-              // Incomplete JSON, put back and wait
               textBuffer = line + '\n' + textBuffer;
               break;
             }
           }
         }
       } catch (streamError) {
-        // If we got partial content, keep it and save what we have
         if (assistantContent) {
           console.log('Stream interrupted, saving partial response');
         } else {
@@ -355,9 +361,11 @@ export function useChat(options: UseChatOptions = {}) {
         }
       }
 
-      // Save assistant message to database
+      // Save assistant message and extract memories
       if (assistantContent) {
         await saveMessage(currentConvId, 'assistant', assistantContent);
+        // Extract and store memories from conversation
+        extractAndStoreMemories(content, assistantContent);
       }
     } catch (error) {
       console.error('Chat error:', error);
@@ -367,7 +375,6 @@ export function useChat(options: UseChatOptions = {}) {
         variant: 'destructive',
       });
       
-      // Remove the empty assistant message on error
       setMessages((prev) => {
         const last = prev[prev.length - 1];
         if (last?.role === 'assistant' && !last.content) {
@@ -378,7 +385,7 @@ export function useChat(options: UseChatOptions = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [user, isLoading, conversationId, messages, createConversation, saveMessage, toast]);
+  }, [user, isLoading, conversationId, messages, personalization, createConversation, saveMessage, toast, extractUrls, scrapeUrl, perplexitySearch, formatPerplexityResults, getMemoryContext, extractAndStoreMemories]);
 
   const clearChat = useCallback(() => {
     setMessages([]);
