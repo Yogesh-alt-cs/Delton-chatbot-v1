@@ -8,6 +8,7 @@ import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { VoiceConversation } from '@/components/chat/VoiceConversation';
 import { MicIndicator } from '@/components/chat/MicIndicator';
+import { DocumentUpload } from '@/components/chat/DocumentUpload';
 import { useChat } from '@/hooks/useChat';
 import { useFeedback } from '@/hooks/useFeedback';
 import { useReminders } from '@/hooks/useReminders';
@@ -27,6 +28,7 @@ export default function Chat() {
   const [mode, setMode] = useState<'text' | 'voice'>('text');
   const [isMicActive, setIsMicActive] = useState(false);
   const [personalization, setPersonalization] = useState<{ name: string | null; style: string; language: string }>({ name: null, style: 'balanced', language: 'en-US' });
+  const [documentContext, setDocumentContext] = useState<string>('');
 
   // Initialize reminders hook for parsing AI responses
   const { parseAndCreateReminder } = useReminders();
@@ -63,8 +65,23 @@ export default function Chat() {
       return;
     }
 
-    await sendMessage(content, images);
-  }, [isLimitReached, incrementUsage, sendMessage, toast, DAILY_LIMIT]);
+    // Append document context if available
+    let enrichedContent = content;
+    if (documentContext) {
+      enrichedContent = content + `\n\n[Document Content]\n${documentContext.slice(0, 8000)}\n[End Document]`;
+    }
+
+    await sendMessage(enrichedContent, images);
+  }, [isLimitReached, incrementUsage, sendMessage, toast, DAILY_LIMIT, documentContext]);
+
+  // Handle document upload
+  const handleDocumentProcessed = useCallback((content: string, fileName: string) => {
+    setDocumentContext(content);
+    toast({
+      title: "Document Ready",
+      description: `${fileName} is ready. Ask questions about it!`,
+    });
+  }, [toast]);
 
   // Load personalization
   useEffect(() => {
@@ -215,10 +232,15 @@ export default function Chat() {
                   <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
                     <span className="text-3xl">👋</span>
                   </div>
-                  <h2 className="mb-2 text-xl font-semibold">Welcome to Delton</h2>
-                  <p className="max-w-xs text-sm text-muted-foreground">
-                    Start a conversation by typing a message below or switch to voice mode for hands-free chat!
+                  <h2 className="mb-2 text-xl font-semibold">Welcome to Delton 2.0</h2>
+                  <p className="max-w-xs text-sm text-muted-foreground mb-4">
+                    Start a conversation, upload documents, or switch to voice mode!
                   </p>
+                  <DocumentUpload 
+                    conversationId={conversationId}
+                    onDocumentProcessed={handleDocumentProcessed}
+                    disabled={isLoading}
+                  />
                 </div>
               ) : (
                 <div className="py-4">

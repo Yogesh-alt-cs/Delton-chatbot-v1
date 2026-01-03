@@ -74,6 +74,50 @@ export type Database = {
         }
         Relationships: []
       }
+      document_chunks: {
+        Row: {
+          chunk_index: number
+          content: string
+          conversation_id: string | null
+          created_at: string
+          file_name: string
+          file_type: string
+          id: string
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          chunk_index: number
+          content: string
+          conversation_id?: string | null
+          created_at?: string
+          file_name: string
+          file_type: string
+          id?: string
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          chunk_index?: number
+          content?: string
+          conversation_id?: string | null
+          created_at?: string
+          file_name?: string
+          file_type?: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_chunks_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feedback: {
         Row: {
           created_at: string
@@ -218,6 +262,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_memories: {
+        Row: {
+          accessed_at: string
+          created_at: string
+          id: string
+          importance: number | null
+          key: string
+          memory_type: string
+          metadata: Json | null
+          updated_at: string
+          user_id: string
+          value: string
+        }
+        Insert: {
+          accessed_at?: string
+          created_at?: string
+          id?: string
+          importance?: number | null
+          key: string
+          memory_type: string
+          metadata?: Json | null
+          updated_at?: string
+          user_id: string
+          value: string
+        }
+        Update: {
+          accessed_at?: string
+          created_at?: string
+          id?: string
+          importance?: number | null
+          key?: string
+          memory_type?: string
+          metadata?: Json | null
+          updated_at?: string
+          user_id?: string
+          value?: string
+        }
+        Relationships: []
       }
       user_settings: {
         Row: {
