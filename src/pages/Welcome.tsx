@@ -88,7 +88,7 @@ export default function Welcome() {
       {/* Footer */}
       <footer className="border-t border-border py-4 text-center">
         <p className="text-sm text-muted-foreground">
-          Powered by Delton AI
+          Powered by AI • Built with Lovable
         </p>
       </footer>
     </div>
