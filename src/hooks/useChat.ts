@@ -262,6 +262,8 @@ export function useChat(options: UseChatOptions = {}) {
       const timeoutId = setTimeout(() => controller.abort(), 60000);
 
       let response: Response;
+      let usedFallback = false;
+
       try {
         response = await fetch(CHAT_URL, {
           method: 'POST',
@@ -275,6 +277,42 @@ export function useChat(options: UseChatOptions = {}) {
           }),
           signal: controller.signal,
         });
+
+        // If main API fails with 402 or 429, try Perplexity fallback
+        if (response.status === 402 || response.status === 429) {
+          console.log('Main API unavailable, trying Perplexity fallback...');
+          
+          const fallbackResult = await perplexitySearch(content);
+          if (fallbackResult) {
+            usedFallback = true;
+            clearTimeout(timeoutId);
+            
+            // Create a synthetic response from Perplexity
+            const fallbackContent = fallbackResult.content + 
+              (fallbackResult.citations?.length > 0 
+                ? '\n\n**Sources:**\n' + fallbackResult.citations.map((c, i) => `${i + 1}. ${c}`).join('\n')
+                : '');
+            
+            // Add assistant message directly
+            const assistantMessage: Message = {
+              id: crypto.randomUUID(),
+              conversation_id: currentConvId,
+              role: 'assistant',
+              content: fallbackContent,
+              created_at: new Date().toISOString(),
+            };
+            setMessages((prev) => [...prev, assistantMessage]);
+            await saveMessage(currentConvId, 'assistant', fallbackContent);
+            extractAndStoreMemories(content, fallbackContent);
+            
+            toast({
+              title: 'Using backup service',
+              description: 'Delton is temporarily using an alternate AI to respond.',
+            });
+            
+            return;
+          }
+        }
       } catch (fetchError) {
         clearTimeout(timeoutId);
         if (fetchError instanceof Error && fetchError.name === 'AbortError') {

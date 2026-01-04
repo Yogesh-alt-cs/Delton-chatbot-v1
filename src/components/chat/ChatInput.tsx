@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { VoiceInputButton } from './VoiceInputButton';
 import { ImageUploadButton } from './ImageUploadButton';
+import { CameraCapture } from './CameraCapture';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { MessageImage } from '@/lib/types';
@@ -123,6 +124,10 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
           images={images}
           onImagesChange={setImages}
           disabled={disabled}
+        />
+        <CameraCapture
+          onCapture={(image) => setImages(prev => [...prev, image])}
+          disabled={disabled || images.length >= 4}
         />
         <VoiceInputButton
           isListening={isListening}
