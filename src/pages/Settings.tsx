@@ -1,4 +1,4 @@
-import { Moon, Sun, Monitor, LogOut, User, Bell, Download, FileText, FileJson, Volume2, Trash2, Sparkles, Globe } from 'lucide-react';
+import { Moon, Sun, Monitor, LogOut, User, Bell, Download, FileText, FileJson, FileType, Volume2, Trash2, Sparkles, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
@@ -357,6 +357,10 @@ export default function Settings() {
                   <DropdownMenuItem onClick={() => exportConversations('json')}>
                     <FileJson className="mr-2 h-4 w-4" />
                     Export as JSON
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportConversations('pdf')}>
+                    <FileType className="mr-2 h-4 w-4" />
+                    Export as PDF
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
