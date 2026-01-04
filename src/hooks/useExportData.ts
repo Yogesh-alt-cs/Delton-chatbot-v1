@@ -7,16 +7,21 @@ import jsPDF from 'jspdf';
 export function useExportData() {
   const { user } = useAuth();
 
-  const fetchConversationsWithMessages = async () => {
+  const fetchConversationsWithMessages = async (conversationId?: string) => {
     if (!user) return null;
 
-    // Fetch all conversations with messages
-    const { data: conversations, error: convError } = await supabase
+    // Fetch conversations (single or all)
+    let query = supabase
       .from('conversations')
       .select('*')
       .eq('user_id', user.id)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false });
+      .is('deleted_at', null);
+    
+    if (conversationId) {
+      query = query.eq('id', conversationId);
+    }
+    
+    const { data: conversations, error: convError } = await query.order('created_at', { ascending: false });
 
     if (convError) throw convError;
 
@@ -24,7 +29,7 @@ export function useExportData() {
       return null;
     }
 
-    // Fetch messages for all conversations
+    // Fetch messages for conversations
     const conversationIds = conversations.map(c => c.id);
     const { data: messages, error: msgError } = await supabase
       .from('messages')
@@ -44,11 +49,11 @@ export function useExportData() {
     return { conversations, messagesByConv };
   };
 
-  const exportConversations = async (exportFormat: 'txt' | 'json' | 'pdf' = 'txt') => {
+  const exportConversations = async (exportFormat: 'txt' | 'json' | 'pdf' = 'txt', conversationId?: string) => {
     if (!user) return;
 
     try {
-      const data = await fetchConversationsWithMessages();
+      const data = await fetchConversationsWithMessages(conversationId);
       
       if (!data) {
         toast.error('No conversations to export');
@@ -58,13 +63,16 @@ export function useExportData() {
       const { conversations, messagesByConv } = data;
 
       if (exportFormat === 'pdf') {
-        await exportToPdf(conversations, messagesByConv);
+        await exportToPdf(conversations, messagesByConv, !!conversationId);
         return;
       }
 
       let content: string;
       let filename: string;
       let mimeType: string;
+      
+      const isSingle = conversationId && conversations.length === 1;
+      const singleTitle = isSingle ? conversations[0].title.replace(/[^a-z0-9]/gi, '-').substring(0, 30) : '';
 
       if (exportFormat === 'json') {
         const exportData = conversations.map(conv => ({
@@ -76,8 +84,10 @@ export function useExportData() {
             created_at: msg.created_at
           }))
         }));
-        content = JSON.stringify(exportData, null, 2);
-        filename = `delton-export-${formatDate(new Date(), 'yyyy-MM-dd')}.json`;
+        content = JSON.stringify(isSingle ? exportData[0] : exportData, null, 2);
+        filename = isSingle 
+          ? `delton-${singleTitle}-${formatDate(new Date(), 'yyyy-MM-dd')}.json`
+          : `delton-export-${formatDate(new Date(), 'yyyy-MM-dd')}.json`;
         mimeType = 'application/json';
       } else {
         const lines: string[] = [];
@@ -103,7 +113,9 @@ export function useExportData() {
         });
 
         content = lines.join('\n');
-        filename = `delton-export-${formatDate(new Date(), 'yyyy-MM-dd')}.txt`;
+        filename = isSingle 
+          ? `delton-${singleTitle}-${formatDate(new Date(), 'yyyy-MM-dd')}.txt`
+          : `delton-export-${formatDate(new Date(), 'yyyy-MM-dd')}.txt`;
         mimeType = 'text/plain';
       }
 
@@ -127,7 +139,8 @@ export function useExportData() {
 
   const exportToPdf = async (
     conversations: any[], 
-    messagesByConv: Record<string, any[]>
+    messagesByConv: Record<string, any[]>,
+    isSingleConversation: boolean = false
   ) => {
     const pdf = new jsPDF();
     const pageWidth = pdf.internal.pageSize.getWidth();
@@ -163,7 +176,7 @@ export function useExportData() {
     pdf.setTextColor(37, 99, 235); // Primary blue
     addText('DELTON CHATBOT', 24, true);
     pdf.setTextColor(0, 0, 0);
-    addText('Conversation Export', 14, false);
+    addText(isSingleConversation ? 'Single Conversation Export' : 'Conversation Export', 14, false);
     yPosition += 5;
     addText(`Exported on: ${formatDate(new Date(), 'PPpp')}`, 10);
     yPosition += 10;
@@ -207,10 +220,12 @@ export function useExportData() {
         yPosition += 5;
       });
 
-      // Separator line
-      pdf.setDrawColor(200, 200, 200);
-      pdf.line(margin, yPosition, pageWidth - margin, yPosition);
-      yPosition += 5;
+      // Separator line (only if multiple conversations)
+      if (!isSingleConversation || conversations.length > 1) {
+        pdf.setDrawColor(200, 200, 200);
+        pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+        yPosition += 5;
+      }
     });
 
     // Footer on last page
@@ -223,11 +238,20 @@ export function useExportData() {
       { align: 'center' }
     );
 
-    // Save the PDF
-    const filename = `delton-export-${formatDate(new Date(), 'yyyy-MM-dd')}.pdf`;
+    // Save the PDF with appropriate filename
+    const singleTitle = isSingleConversation && conversations.length === 1 
+      ? conversations[0].title.replace(/[^a-z0-9]/gi, '-').substring(0, 30) 
+      : '';
+    const filename = isSingleConversation
+      ? `delton-${singleTitle}-${formatDate(new Date(), 'yyyy-MM-dd')}.pdf`
+      : `delton-export-${formatDate(new Date(), 'yyyy-MM-dd')}.pdf`;
     pdf.save(filename);
     toast.success('PDF exported successfully');
   };
 
-  return { exportConversations };
+  const exportSingleConversation = async (conversationId: string, format: 'txt' | 'json' | 'pdf' = 'pdf') => {
+    await exportConversations(format, conversationId);
+  };
+
+  return { exportConversations, exportSingleConversation };
 }

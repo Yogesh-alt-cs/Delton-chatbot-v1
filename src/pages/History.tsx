@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MessageSquare, Trash2, ChevronRight, Share2, Archive, ArchiveRestore, Clock, Timer } from 'lucide-react';
+import { Search, MessageSquare, Trash2, ChevronRight, Share2, Archive, ArchiveRestore, Clock, Timer, FileType } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useConversations } from '@/hooks/useConversations';
 import { useShareConversation } from '@/hooks/useShareConversation';
+import { useExportData } from '@/hooks/useExportData';
 import { useToast } from '@/hooks/use-toast';
 import { groupConversationsByDate, formatConversationDate } from '@/lib/dateUtils';
 import { Conversation } from '@/lib/types';
@@ -40,6 +41,7 @@ export default function History() {
     setConversationExpiry,
   } = useConversations();
   const { shareConversation } = useShareConversation();
+  const { exportSingleConversation } = useExportData();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Conversation[] | null>(null);
@@ -192,6 +194,16 @@ export default function History() {
           </DropdownMenuContent>
         </DropdownMenu>
       )}
+      
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-10 w-10 shrink-0 text-muted-foreground hover:text-primary"
+        onClick={() => exportSingleConversation(conv.id, 'pdf')}
+        title="Export as PDF"
+      >
+        <FileType className="h-4 w-4" />
+      </Button>
       
       <Button
         variant="ghost"
