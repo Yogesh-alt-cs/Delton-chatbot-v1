@@ -4,10 +4,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Message, Conversation, MessageImage } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useLongTermMemory } from '@/hooks/useLongTermMemory';
-import { usePerplexitySearch } from '@/hooks/usePerplexitySearch';
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
-const FIRECRAWL_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/firecrawl-scrape`;
+const FIRECRAWL_SCRAPE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/firecrawl-scrape`;
+const FIRECRAWL_SEARCH_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/firecrawl-search`;
 
 interface UseChatOptions {
   conversationId?: string;
@@ -24,9 +24,17 @@ function needsLiveSearch(query: string): boolean {
     'what is happening', 'what happened', 'breaking',
     'trending', 'update', 'live', 'real-time', 'realtime',
     '2025', '2026', 'this week', 'this month', 'yesterday',
+    'who won', 'who is', 'what is the', 'how much', 'how many',
   ];
   
   return liveKeywords.some(keyword => lowerQuery.includes(keyword));
+}
+
+interface FirecrawlSearchResult {
+  url: string;
+  title?: string;
+  description?: string;
+  markdown?: string;
 }
 
 export function useChat(options: UseChatOptions = {}) {
@@ -37,7 +45,6 @@ export function useChat(options: UseChatOptions = {}) {
   const { user } = useAuth();
   const { toast } = useToast();
   const { getMemoryContext, extractAndStoreMemories } = useLongTermMemory();
-  const { search: perplexitySearch, formatForContext: formatPerplexityResults } = usePerplexitySearch();
 
   // Load personalization settings
   useEffect(() => {
@@ -148,7 +155,7 @@ export function useChat(options: UseChatOptions = {}) {
 
   const scrapeUrl = useCallback(async (url: string): Promise<string | null> => {
     try {
-      const response = await fetch(FIRECRAWL_URL, {
+      const response = await fetch(FIRECRAWL_SCRAPE_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -168,6 +175,56 @@ export function useChat(options: UseChatOptions = {}) {
       return null;
     } catch (err) {
       console.error('URL scrape error:', err);
+      return null;
+    }
+  }, []);
+
+  // Live web search using Firecrawl
+  const searchWeb = useCallback(async (query: string): Promise<string | null> => {
+    try {
+      console.log('Triggering Firecrawl live search for:', query);
+      
+      const response = await fetch(FIRECRAWL_SEARCH_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ query, limit: 5 }),
+      });
+
+      if (!response.ok) {
+        console.error('Firecrawl search failed:', response.status);
+        return null;
+      }
+
+      const data = await response.json();
+      
+      if (!data.success || !data.data || data.data.length === 0) {
+        console.log('No search results found');
+        return null;
+      }
+
+      // Format search results for context
+      let formattedResults = '\n\n---\n🔍 **Live Web Search Results:**\n\n';
+      
+      (data.data as FirecrawlSearchResult[]).slice(0, 5).forEach((result, index) => {
+        formattedResults += `**${index + 1}. ${result.title || 'Untitled'}**\n`;
+        if (result.description) {
+          formattedResults += `${result.description}\n`;
+        }
+        if (result.markdown) {
+          const preview = result.markdown.slice(0, 800);
+          formattedResults += `${preview}${result.markdown.length > 800 ? '...' : ''}\n`;
+        }
+        formattedResults += `Source: ${result.url}\n\n`;
+      });
+      
+      formattedResults += '---\n';
+      
+      return formattedResults;
+    } catch (err) {
+      console.error('Web search error:', err);
       return null;
     }
   }, []);
@@ -198,13 +255,11 @@ export function useChat(options: UseChatOptions = {}) {
         }
       }
 
-      // Check if we need autonomous live web search (Perplexity)
+      // Check if we need live web search
       if (needsLiveSearch(content)) {
-        console.log('Triggering Perplexity search for:', content);
-        const searchResult = await perplexitySearch(content);
-        if (searchResult) {
-          const formattedResults = formatPerplexityResults(searchResult);
-          enrichedContent = enrichedContent + formattedResults;
+        const searchResults = await searchWeb(content);
+        if (searchResults) {
+          enrichedContent = enrichedContent + searchResults;
         }
       }
 
@@ -262,7 +317,6 @@ export function useChat(options: UseChatOptions = {}) {
       const timeoutId = setTimeout(() => controller.abort(), 60000);
 
       let response: Response;
-      let usedFallback = false;
 
       try {
         response = await fetch(CHAT_URL, {
@@ -277,42 +331,6 @@ export function useChat(options: UseChatOptions = {}) {
           }),
           signal: controller.signal,
         });
-
-        // If main API fails with 402 or 429, try Perplexity fallback
-        if (response.status === 402 || response.status === 429) {
-          console.log('Main API unavailable, trying Perplexity fallback...');
-          
-          const fallbackResult = await perplexitySearch(content);
-          if (fallbackResult) {
-            usedFallback = true;
-            clearTimeout(timeoutId);
-            
-            // Create a synthetic response from Perplexity
-            const fallbackContent = fallbackResult.content + 
-              (fallbackResult.citations?.length > 0 
-                ? '\n\n**Sources:**\n' + fallbackResult.citations.map((c, i) => `${i + 1}. ${c}`).join('\n')
-                : '');
-            
-            // Add assistant message directly
-            const assistantMessage: Message = {
-              id: crypto.randomUUID(),
-              conversation_id: currentConvId,
-              role: 'assistant',
-              content: fallbackContent,
-              created_at: new Date().toISOString(),
-            };
-            setMessages((prev) => [...prev, assistantMessage]);
-            await saveMessage(currentConvId, 'assistant', fallbackContent);
-            extractAndStoreMemories(content, fallbackContent);
-            
-            toast({
-              title: 'Using backup service',
-              description: 'Delton is temporarily using an alternate AI to respond.',
-            });
-            
-            return;
-          }
-        }
       } catch (fetchError) {
         clearTimeout(timeoutId);
         if (fetchError instanceof Error && fetchError.name === 'AbortError') {
@@ -423,7 +441,7 @@ export function useChat(options: UseChatOptions = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [user, isLoading, conversationId, messages, personalization, createConversation, saveMessage, toast, extractUrls, scrapeUrl, perplexitySearch, formatPerplexityResults, getMemoryContext, extractAndStoreMemories]);
+  }, [user, isLoading, conversationId, messages, personalization, createConversation, saveMessage, toast, extractUrls, scrapeUrl, searchWeb, getMemoryContext, extractAndStoreMemories]);
 
   const clearChat = useCallback(() => {
     setMessages([]);
