@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Conversation } from '@/lib/types';
@@ -7,7 +7,10 @@ export function useConversations() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [archivedConversations, setArchivedConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
+  const mountedRef = useRef(true);
 
   const loadConversations = useCallback(async () => {
     if (!user) {
@@ -18,8 +21,10 @@ export function useConversations() {
     }
 
     try {
+      setError(null);
+      
       // Load active conversations (non-archived)
-      const { data, error } = await supabase
+      const { data, error: fetchError } = await supabase
         .from('conversations')
         .select('*')
         .eq('user_id', user.id)
@@ -27,7 +32,9 @@ export function useConversations() {
         .is('archived_at', null)
         .order('updated_at', { ascending: false });
 
-      if (error) throw error;
+      if (fetchError) throw fetchError;
+      
+      if (!mountedRef.current) return;
       
       // Filter out expired conversations
       const now = new Date();
@@ -49,13 +56,18 @@ export function useConversations() {
         .not('archived_at', 'is', null)
         .order('archived_at', { ascending: false });
 
-      if (!archivedError && archived) {
+      if (!archivedError && archived && mountedRef.current) {
         setArchivedConversations(archived as Conversation[]);
       }
-    } catch (error) {
-      console.error('Error loading conversations:', error);
+    } catch (err) {
+      console.error('Error loading conversations:', err);
+      if (mountedRef.current) {
+        setError('Failed to load conversations');
+      }
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [user]);
 
@@ -137,11 +149,24 @@ export function useConversations() {
     }
   }, [user, conversations]);
 
-  const deleteConversation = useCallback(async (id: string) => {
+  const deleteConversation = useCallback(async (id: string): Promise<boolean> => {
     if (!user) {
       console.error('No user found for delete operation');
       return false;
     }
+    
+    // Prevent double-delete
+    if (deletingIds.has(id)) {
+      return false;
+    }
+    
+    // Optimistically remove from UI
+    setDeletingIds(prev => new Set(prev).add(id));
+    const previousConversations = [...conversations];
+    const previousArchived = [...archivedConversations];
+    
+    setConversations(prev => prev.filter(c => c.id !== id));
+    setArchivedConversations(prev => prev.filter(c => c.id !== id));
     
     try {
       console.log('Deleting conversation:', id, 'for user:', user.id);
@@ -158,17 +183,31 @@ export function useConversations() {
       }
       
       console.log('Conversation deleted successfully');
-      setConversations((prev) => prev.filter((c) => c.id !== id));
-      setArchivedConversations((prev) => prev.filter((c) => c.id !== id));
       return true;
     } catch (error) {
       console.error('Error deleting conversation:', error);
+      // Rollback on error
+      setConversations(previousConversations);
+      setArchivedConversations(previousArchived);
       return false;
+    } finally {
+      setDeletingIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     }
-  }, [user]);
+  }, [user, conversations, archivedConversations, deletingIds]);
 
   const archiveConversation = useCallback(async (id: string) => {
     if (!user) return false;
+    
+    const archivedConv = conversations.find(c => c.id === id);
+    if (!archivedConv) return false;
+    
+    // Optimistic update
+    setConversations(prev => prev.filter(c => c.id !== id));
+    setArchivedConversations(prev => [{ ...archivedConv, archived_at: new Date().toISOString() }, ...prev]);
     
     try {
       const { error } = await supabase
@@ -178,21 +217,25 @@ export function useConversations() {
         .eq('user_id', user.id);
 
       if (error) throw error;
-      
-      const archivedConv = conversations.find(c => c.id === id);
-      if (archivedConv) {
-        setConversations((prev) => prev.filter((c) => c.id !== id));
-        setArchivedConversations((prev) => [{ ...archivedConv, archived_at: new Date().toISOString() }, ...prev]);
-      }
       return true;
     } catch (error) {
       console.error('Error archiving conversation:', error);
+      // Rollback
+      setConversations(prev => [archivedConv, ...prev]);
+      setArchivedConversations(prev => prev.filter(c => c.id !== id));
       return false;
     }
   }, [user, conversations]);
 
   const unarchiveConversation = useCallback(async (id: string) => {
     if (!user) return false;
+    
+    const unarchivedConv = archivedConversations.find(c => c.id === id);
+    if (!unarchivedConv) return false;
+    
+    // Optimistic update
+    setArchivedConversations(prev => prev.filter(c => c.id !== id));
+    setConversations(prev => [{ ...unarchivedConv, archived_at: null }, ...prev]);
     
     try {
       const { error } = await supabase
@@ -202,15 +245,12 @@ export function useConversations() {
         .eq('user_id', user.id);
 
       if (error) throw error;
-      
-      const unarchivedConv = archivedConversations.find(c => c.id === id);
-      if (unarchivedConv) {
-        setArchivedConversations((prev) => prev.filter((c) => c.id !== id));
-        setConversations((prev) => [{ ...unarchivedConv, archived_at: null }, ...prev]);
-      }
       return true;
     } catch (error) {
       console.error('Error unarchiving conversation:', error);
+      // Rollback
+      setArchivedConversations(prev => [unarchivedConv, ...prev]);
+      setConversations(prev => prev.filter(c => c.id !== id));
       return false;
     }
   }, [user, archivedConversations]);
@@ -227,7 +267,7 @@ export function useConversations() {
 
       if (error) throw error;
       
-      setConversations((prev) => 
+      setConversations(prev => 
         prev.map(c => c.id === id ? { ...c, expires_at: expiresAt?.toISOString() || null } : c)
       );
       return true;
@@ -237,14 +277,61 @@ export function useConversations() {
     }
   }, [user]);
 
+  // Load on mount and when user changes
   useEffect(() => {
+    mountedRef.current = true;
     loadConversations();
+    
+    return () => {
+      mountedRef.current = false;
+    };
   }, [loadConversations]);
+
+  // Refresh on window focus
+  useEffect(() => {
+    const handleFocus = () => {
+      if (user && !isLoading) {
+        loadConversations();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [user, isLoading, loadConversations]);
+
+  // Subscribe to realtime changes
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('conversations-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversations',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('Realtime update:', payload);
+          // Reload on any change to ensure consistency
+          loadConversations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, loadConversations]);
 
   return {
     conversations,
     archivedConversations,
     isLoading,
+    deletingIds,
+    error,
     loadConversations,
     searchConversations,
     deleteConversation,
