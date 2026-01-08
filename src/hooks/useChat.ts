@@ -342,14 +342,34 @@ export function useChat(options: UseChatOptions = {}) {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        if (response.status === 429) {
-          throw new Error('Delton is a bit busy right now. Please wait a moment and try again.');
+        // Handle known error statuses without throwing (prevents blank-screen runtime errors)
+        if (response.status === 402 || response.status === 429) {
+          const errorData = await response.json().catch(() => ({} as any));
+          const friendlyMessage =
+            (errorData as any)?.error ||
+            (response.status === 429
+              ? 'Delton is a bit busy right now. Please wait a moment and try again.'
+              : 'Delton is taking a break. Please try again later.');
+
+          const assistantErrorMessage: Message = {
+            id: crypto.randomUUID(),
+            conversation_id: currentConvId,
+            role: 'assistant',
+            content: friendlyMessage,
+            created_at: new Date().toISOString(),
+          };
+
+          setMessages((prev) => [...prev, assistantErrorMessage]);
+          toast({
+            title: 'Delton is unavailable',
+            description: friendlyMessage,
+            variant: 'destructive',
+          });
+          return;
         }
-        if (response.status === 402) {
-          throw new Error('Delton is taking a break. Please try again later.');
-        }
-        throw new Error(errorData.error || `Something went wrong. Please try again.`);
+
+        const errorData = await response.json().catch(() => ({} as any));
+        throw new Error((errorData as any).error || `Something went wrong. Please try again.`);
       }
 
       if (!response.body) {
