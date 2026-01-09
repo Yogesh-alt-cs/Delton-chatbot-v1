@@ -37,3 +37,12 @@ verify_jwt = false
 
 [functions.parse-document]
 verify_jwt = false
+
+[functions.unified-ai]
+verify_jwt = false
+
+[functions.vision-analyze]
+verify_jwt = false
+
+[functions.problem-solver]
+verify_jwt = false

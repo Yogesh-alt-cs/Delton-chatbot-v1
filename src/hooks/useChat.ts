@@ -5,9 +5,12 @@ import { Message, Conversation, MessageImage } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useLongTermMemory } from '@/hooks/useLongTermMemory';
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
+// Use unified-ai for multi-provider support with fallback
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/unified-ai`;
 const FIRECRAWL_SCRAPE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/firecrawl-scrape`;
 const FIRECRAWL_SEARCH_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/firecrawl-search`;
+const VISION_ANALYZE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vision-analyze`;
+const PROBLEM_SOLVER_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/problem-solver`;
 
 interface UseChatOptions {
   conversationId?: string;
@@ -28,6 +31,31 @@ function needsLiveSearch(query: string): boolean {
   ];
   
   return liveKeywords.some(keyword => lowerQuery.includes(keyword));
+}
+
+// Check if query is a problem-solving request
+function isProblemSolvingQuery(query: string): { isProblem: boolean; type: string } {
+  const lowerQuery = query.toLowerCase();
+  
+  const mathPatterns = ['solve', 'calculate', 'compute', 'what is', 'evaluate', 'simplify', 'integrate', 'derive', 'differentiate', '='];
+  const physicsPatterns = ['newton', 'force', 'velocity', 'acceleration', 'energy', 'momentum', 'gravity', 'physics'];
+  const codingPatterns = ['write code', 'implement', 'algorithm', 'function', 'debug', 'fix this code', 'coding'];
+  const logicPatterns = ['prove', 'logic', 'if then', 'deduce', 'infer', 'reasoning'];
+  
+  if (mathPatterns.some(p => lowerQuery.includes(p)) && /\d/.test(query)) {
+    return { isProblem: true, type: 'math' };
+  }
+  if (physicsPatterns.some(p => lowerQuery.includes(p))) {
+    return { isProblem: true, type: 'physics' };
+  }
+  if (codingPatterns.some(p => lowerQuery.includes(p))) {
+    return { isProblem: true, type: 'coding' };
+  }
+  if (logicPatterns.some(p => lowerQuery.includes(p))) {
+    return { isProblem: true, type: 'logic' };
+  }
+  
+  return { isProblem: false, type: 'general' };
 }
 
 interface FirecrawlSearchResult {
@@ -305,8 +333,6 @@ export function useChat(options: UseChatOptions = {}) {
       };
 
       const chatMessages = [
-        ...(personalization.name ? [{ role: 'system' as const, content: `USER_NAME:${personalization.name}` }] : []),
-        { role: 'system' as const, content: `USER_STYLE:${personalization.style}` },
         ...messages
           .filter(m => m.role !== 'system')
           .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
@@ -314,7 +340,7 @@ export function useChat(options: UseChatOptions = {}) {
       ];
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      const timeoutId = setTimeout(() => controller.abort(), 90000); // Increased timeout for multi-provider
 
       let response: Response;
 
@@ -328,6 +354,8 @@ export function useChat(options: UseChatOptions = {}) {
           body: JSON.stringify({
             messages: chatMessages,
             conversationId: currentConvId,
+            userName: personalization.name,
+            userStyle: personalization.style,
           }),
           signal: controller.signal,
         });
