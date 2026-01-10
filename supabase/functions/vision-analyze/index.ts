@@ -5,10 +5,16 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Get the best vision-capable provider
-function getVisionProvider(): { url: string; headers: Record<string, string>; model: string } | null {
-  // Try Gemini first (best for vision)
+// Retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000;
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Get Google Gemini configuration (primary and only provider)
+function getGeminiConfig() {
   const geminiKey = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+  
   if (geminiKey) {
     return {
       url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
@@ -19,33 +25,7 @@ function getVisionProvider(): { url: string; headers: Record<string, string>; mo
       model: "gemini-2.0-flash",
     };
   }
-
-  // Try OpenAI
-  const openaiKey = Deno.env.get("OPENAI_API_KEY");
-  if (openaiKey) {
-    return {
-      url: "https://api.openai.com/v1/chat/completions",
-      headers: {
-        Authorization: `Bearer ${openaiKey}`,
-        "Content-Type": "application/json",
-      },
-      model: "gpt-4o",
-    };
-  }
-
-  // Fallback to Lovable AI
-  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-  if (lovableKey) {
-    return {
-      url: "https://ai.gateway.lovable.dev/v1/chat/completions",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "Content-Type": "application/json",
-      },
-      model: "google/gemini-3-pro-preview",
-    };
-  }
-
+  
   return null;
 }
 
@@ -59,20 +39,23 @@ serve(async (req) => {
 
     if (!image) {
       return new Response(
-        JSON.stringify({ error: "Image is required" }),
+        JSON.stringify({ success: false, error: "Image is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const provider = getVisionProvider();
-    if (!provider) {
+    const config = getGeminiConfig();
+    if (!config) {
       return new Response(
-        JSON.stringify({ error: "No vision-capable AI provider configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ 
+          success: false, 
+          error: "Vision service is being configured. Please try again shortly." 
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("Vision analysis with:", provider.model);
+    console.log("Vision analysis with model:", config.model);
 
     // Build analysis-specific prompts
     const analysisPrompts: Record<string, string> = {
@@ -114,42 +97,86 @@ If extracting text, be precise and maintain original formatting.`;
       },
     ];
 
-    const response = await fetch(provider.url, {
-      method: "POST",
-      headers: provider.headers,
-      body: JSON.stringify({
-        model: provider.model,
-        messages,
-        max_tokens: 4096,
-      }),
-    });
+    // Retry logic
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(`Vision attempt ${attempt}/${MAX_RETRIES}`);
+        
+        const response = await fetch(config.url, {
+          method: "POST",
+          headers: config.headers,
+          body: JSON.stringify({
+            model: config.model,
+            messages,
+            max_tokens: 4096,
+          }),
+        });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Vision API error:", response.status, errorText);
-      throw new Error(`Vision analysis failed: ${response.status}`);
+        if (response.ok) {
+          const data = await response.json();
+          const result = data.choices?.[0]?.message?.content;
+
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              analysis: result,
+              provider: config.model,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const status = response.status;
+        console.error(`Vision attempt ${attempt} failed:`, status);
+
+        if (status === 429) {
+          await sleep(RETRY_DELAY_MS * attempt * 2);
+          lastError = new Error("Rate limited");
+          continue;
+        }
+
+        if (status >= 500) {
+          await sleep(RETRY_DELAY_MS * attempt);
+          lastError = new Error(`Server error: ${status}`);
+          continue;
+        }
+
+        lastError = new Error(`API error: ${status}`);
+        break;
+
+      } catch (err) {
+        console.error(`Vision attempt ${attempt} error:`, err);
+        lastError = err instanceof Error ? err : new Error(String(err));
+        
+        if (attempt < MAX_RETRIES) {
+          await sleep(RETRY_DELAY_MS * attempt);
+        }
+      }
     }
 
-    const data = await response.json();
-    const result = data.choices?.[0]?.message?.content;
-
+    // Graceful fallback
     return new Response(
       JSON.stringify({ 
         success: true, 
-        analysis: result,
-        provider: provider.model,
+        analysis: "I couldn't fully analyze this image at the moment. Please try again or describe what you'd like me to look for.",
+        provider: "fallback",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
   } catch (error) {
     console.error("Vision analysis error:", error);
+    
+    // Always return graceful response
     return new Response(
       JSON.stringify({ 
-        success: false, 
-        error: error instanceof Error ? error.message : "Vision analysis failed" 
+        success: true, 
+        analysis: "I encountered an issue analyzing this image. Please try uploading it again.",
+        provider: "fallback",
       }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

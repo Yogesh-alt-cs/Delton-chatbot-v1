@@ -5,110 +5,36 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Provider configurations
-interface ProviderConfig {
-  name: string;
-  baseUrl: string;
-  getHeaders: (apiKey: string) => Record<string, string>;
-  models: {
-    text: string;
-    vision: string;
-    reasoning: string;
-  };
-  available: boolean;
-}
+// Retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000;
 
-const getProviders = (): ProviderConfig[] => {
-  const providers: ProviderConfig[] = [];
+// Sleep utility
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-  // Lovable AI (always available as primary)
-  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-  if (lovableKey) {
-    providers.push({
-      name: "lovable",
-      baseUrl: "https://ai.gateway.lovable.dev/v1/chat/completions",
-      getHeaders: (key) => ({
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-      }),
-      models: {
-        text: "google/gemini-3-flash-preview",
-        vision: "google/gemini-3-pro-preview",
-        reasoning: "google/gemini-3-pro-preview",
-      },
-      available: true,
-    });
-  }
-
-  // OpenAI
-  const openaiKey = Deno.env.get("OPENAI_API_KEY");
-  if (openaiKey) {
-    providers.push({
-      name: "openai",
-      baseUrl: "https://api.openai.com/v1/chat/completions",
-      getHeaders: (key) => ({
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-      }),
-      models: {
-        text: "gpt-4o-mini",
-        vision: "gpt-4o",
-        reasoning: "gpt-4o",
-      },
-      available: true,
-    });
-  }
-
-  // Google Gemini Direct
+// Get Google Gemini configuration (primary and only provider)
+function getGeminiConfig() {
   const geminiKey = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+  
   if (geminiKey) {
-    providers.push({
+    return {
       name: "gemini",
       baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-      getHeaders: (key) => ({
-        Authorization: `Bearer ${key}`,
+      apiKey: geminiKey,
+      headers: {
+        Authorization: `Bearer ${geminiKey}`,
         "Content-Type": "application/json",
-      }),
+      },
       models: {
-        text: "gemini-2.0-flash",
+        fast: "gemini-2.0-flash",
+        pro: "gemini-2.5-pro-preview-06-05",
         vision: "gemini-2.0-flash",
-        reasoning: "gemini-2.5-pro-preview-06-05",
       },
-      available: true,
-    });
+    };
   }
-
-  // DeepSeek
-  const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY");
-  if (deepseekKey) {
-    providers.push({
-      name: "deepseek",
-      baseUrl: "https://api.deepseek.com/chat/completions",
-      getHeaders: (key) => ({
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-      }),
-      models: {
-        text: "deepseek-chat",
-        vision: "deepseek-chat",
-        reasoning: "deepseek-reasoner",
-      },
-      available: true,
-    });
-  }
-
-  return providers;
-};
-
-const getApiKey = (providerName: string): string | undefined => {
-  switch (providerName) {
-    case "lovable": return Deno.env.get("LOVABLE_API_KEY");
-    case "openai": return Deno.env.get("OPENAI_API_KEY");
-    case "gemini": return Deno.env.get("GOOGLE_GEMINI_API_KEY");
-    case "deepseek": return Deno.env.get("DEEPSEEK_API_KEY");
-    default: return undefined;
-  }
-};
+  
+  return null;
+}
 
 // Determine task type from content
 type TaskType = "text" | "vision" | "reasoning" | "document" | "search";
@@ -147,97 +73,39 @@ function detectTaskType(messages: any[]): TaskType {
   return "text";
 }
 
-// Select best provider for task
-function selectProvider(
-  providers: ProviderConfig[],
-  taskType: TaskType,
-  preferredProvider?: string
-): { provider: ProviderConfig; model: string } | null {
-  if (providers.length === 0) return null;
-
-  // If preferred provider specified and available
-  if (preferredProvider) {
-    const preferred = providers.find(p => p.name === preferredProvider);
-    if (preferred) {
-      const model = taskType === "vision" ? preferred.models.vision :
-                    taskType === "reasoning" ? preferred.models.reasoning :
-                    preferred.models.text;
-      return { provider: preferred, model };
-    }
-  }
-
-  // Auto-select based on task type
-  // For vision: prefer Gemini/OpenAI over DeepSeek
-  // For reasoning: prefer DeepSeek reasoner or Gemini Pro
-  // For text: use fastest available (Flash models)
-
-  const priorityOrder: Record<TaskType, string[]> = {
-    vision: ["gemini", "openai", "lovable", "deepseek"],
-    reasoning: ["deepseek", "gemini", "lovable", "openai"],
-    document: ["gemini", "lovable", "openai", "deepseek"],
-    search: ["lovable", "gemini", "openai", "deepseek"],
-    text: ["lovable", "gemini", "deepseek", "openai"],
-  };
-
-  const order = priorityOrder[taskType];
+// Select model based on task type
+function selectModel(config: ReturnType<typeof getGeminiConfig>, taskType: TaskType): string {
+  if (!config) return "gemini-2.0-flash";
   
-  for (const providerName of order) {
-    const provider = providers.find(p => p.name === providerName);
-    if (provider) {
-      const model = taskType === "vision" ? provider.models.vision :
-                    taskType === "reasoning" ? provider.models.reasoning :
-                    provider.models.text;
-      return { provider, model };
-    }
+  switch (taskType) {
+    case "vision":
+      return config.models.vision;
+    case "reasoning":
+      return config.models.pro;
+    case "document":
+      return config.models.pro;
+    default:
+      return config.models.fast;
   }
-
-  // Fallback to first available
-  const first = providers[0];
-  return { provider: first, model: first.models.text };
 }
 
-// Make request with fallback
-async function makeRequestWithFallback(
-  providers: ProviderConfig[],
-  taskType: TaskType,
+// Make request with retry logic
+async function makeRequestWithRetry(
+  config: NonNullable<ReturnType<typeof getGeminiConfig>>,
+  model: string,
   messages: any[],
   systemPrompt: string,
   stream: boolean = true
 ): Promise<Response> {
-  const tried = new Set<string>();
   let lastError: Error | null = null;
-
-  // Try providers in priority order
-  const priorityOrder: Record<TaskType, string[]> = {
-    vision: ["gemini", "openai", "lovable", "deepseek"],
-    reasoning: ["deepseek", "gemini", "lovable", "openai"],
-    document: ["gemini", "lovable", "openai", "deepseek"],
-    search: ["lovable", "gemini", "openai", "deepseek"],
-    text: ["lovable", "gemini", "deepseek", "openai"],
-  };
-
-  const order = priorityOrder[taskType];
-
-  for (const providerName of order) {
-    if (tried.has(providerName)) continue;
-    
-    const provider = providers.find(p => p.name === providerName);
-    if (!provider) continue;
-
-    tried.add(providerName);
-    const apiKey = getApiKey(providerName);
-    if (!apiKey) continue;
-
-    const model = taskType === "vision" ? provider.models.vision :
-                  taskType === "reasoning" ? provider.models.reasoning :
-                  provider.models.text;
-
-    console.log(`Trying provider: ${providerName} with model: ${model} for task: ${taskType}`);
-
+  
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const response = await fetch(provider.baseUrl, {
+      console.log(`Attempt ${attempt}/${MAX_RETRIES} with model: ${model}`);
+      
+      const response = await fetch(config.baseUrl, {
         method: "POST",
-        headers: provider.getHeaders(apiKey),
+        headers: config.headers,
         body: JSON.stringify({
           model,
           messages: [
@@ -245,40 +113,78 @@ async function makeRequestWithFallback(
             ...messages,
           ],
           stream,
-          ...(taskType === "reasoning" && providerName === "deepseek" ? {
-            // DeepSeek reasoner specific settings
-            temperature: 0.1,
-          } : {}),
         }),
       });
 
       if (response.ok) {
-        console.log(`Success with provider: ${providerName}`);
+        console.log(`Success on attempt ${attempt}`);
         return response;
       }
 
-      // Check for rate limit or payment issues
-      if (response.status === 429 || response.status === 402) {
-        console.log(`Provider ${providerName} rate limited/payment issue, trying next...`);
-        lastError = new Error(`${providerName}: Rate limited or payment required`);
+      // Handle specific error codes
+      const status = response.status;
+      const errorText = await response.text();
+      console.error(`Attempt ${attempt} failed:`, status, errorText);
+
+      // Rate limit - wait longer before retry
+      if (status === 429) {
+        console.log("Rate limited, waiting before retry...");
+        await sleep(RETRY_DELAY_MS * attempt * 2);
+        lastError = new Error("Rate limited");
         continue;
       }
 
-      // Other error, try next provider
-      const errorText = await response.text();
-      console.error(`Provider ${providerName} error:`, response.status, errorText);
-      lastError = new Error(`${providerName}: ${response.status}`);
-      continue;
+      // Server error - retry
+      if (status >= 500) {
+        await sleep(RETRY_DELAY_MS * attempt);
+        lastError = new Error(`Server error: ${status}`);
+        continue;
+      }
 
+      // Client error (400, 401, 403, etc.) - don't retry, throw immediately
+      if (status >= 400 && status < 500) {
+        throw new Error(`API error: ${status}`);
+      }
+
+      lastError = new Error(`Unexpected status: ${status}`);
+      
     } catch (err) {
-      console.error(`Provider ${providerName} fetch error:`, err);
+      console.error(`Attempt ${attempt} error:`, err);
       lastError = err instanceof Error ? err : new Error(String(err));
-      continue;
+      
+      if (attempt < MAX_RETRIES) {
+        await sleep(RETRY_DELAY_MS * attempt);
+      }
     }
   }
 
-  // All providers failed
-  throw lastError || new Error("All AI providers unavailable");
+  throw lastError || new Error("Request failed after all retries");
+}
+
+// Generate a graceful fallback response
+function generateFallbackResponse(): Response {
+  const fallbackMessage = {
+    id: "fallback",
+    object: "chat.completion",
+    created: Date.now(),
+    model: "fallback",
+    choices: [{
+      index: 0,
+      message: {
+        role: "assistant",
+        content: "I'm processing your request. Please give me a moment and try again. If this persists, there might be a temporary service issue."
+      },
+      finish_reason: "stop"
+    }]
+  };
+
+  return new Response(
+    JSON.stringify(fallbackMessage),
+    { 
+      status: 200, 
+      headers: { "Content-Type": "application/json" } 
+    }
+  );
 }
 
 serve(async (req) => {
@@ -287,28 +193,39 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, conversationId, preferredProvider, userName, userStyle } = await req.json();
+    const { messages, conversationId, userName, userStyle } = await req.json();
     
     console.log("Unified AI request:", { 
       conversationId, 
       messageCount: messages?.length,
-      preferredProvider 
     });
 
-    const providers = getProviders();
+    // Get Google Gemini config (only provider)
+    const geminiConfig = getGeminiConfig();
     
-    if (providers.length === 0) {
+    if (!geminiConfig) {
+      console.error("GOOGLE_GEMINI_API_KEY not configured");
+      // Return graceful fallback instead of error
       return new Response(
-        JSON.stringify({ error: "No AI providers configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          choices: [{
+            message: {
+              role: "assistant",
+              content: "I'm currently being set up. Please ensure the Google AI Studio API key is configured."
+            }
+          }]
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    console.log("Available providers:", providers.map(p => p.name));
 
     // Detect task type
     const taskType = detectTaskType(messages);
     console.log("Detected task type:", taskType);
+
+    // Select appropriate model
+    const model = selectModel(geminiConfig, taskType);
+    console.log("Selected model:", model);
 
     // Build system prompt
     const now = new Date();
@@ -382,8 +299,7 @@ CORE CAPABILITIES (Delton 2.0):
 3. **Document Analysis**: Process PDFs, DOCX, CSV, TXT files with RAG
 4. **Code Interpreter**: Execute Python code for calculations, data analysis, plots
 5. **Long-Term Memory**: Remember user preferences, names, and context across sessions
-6. **Multi-Provider AI**: Automatically selects the best AI model for each task
-7. **Problem Solving**: Step-by-step solutions for math, physics, coding problems
+6. **Problem Solving**: Step-by-step solutions for math, physics, coding problems
 
 ${taskInstructions[taskType]}
 
@@ -414,35 +330,68 @@ IMPORTANT GUIDELINES:
       !(m.role === 'system' && (m.content?.startsWith?.('USER_NAME:') || m.content?.startsWith?.('USER_STYLE:')))
     );
 
-    // Make request with fallback
-    const response = await makeRequestWithFallback(
-      providers,
-      taskType,
-      filteredMessages,
-      systemPrompt,
-      true
-    );
+    try {
+      // Make request with retry logic
+      const response = await makeRequestWithRetry(
+        geminiConfig,
+        model,
+        filteredMessages,
+        systemPrompt,
+        true
+      );
 
-    return new Response(response.body, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-    });
+      return new Response(response.body, {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
+
+    } catch (apiError) {
+      console.error("API request failed after retries:", apiError);
+      
+      // Return graceful fallback response instead of error
+      const fallbackContent = "I encountered a temporary issue while processing your request. Please try again in a moment.";
+      
+      // Create a simple SSE response with the fallback message
+      const encoder = new TextEncoder();
+      const fallbackData = {
+        id: "fallback",
+        object: "chat.completion.chunk",
+        created: Date.now(),
+        model: "fallback",
+        choices: [{
+          index: 0,
+          delta: { content: fallbackContent },
+          finish_reason: "stop"
+        }]
+      };
+      
+      const sseMessage = `data: ${JSON.stringify(fallbackData)}\n\ndata: [DONE]\n\n`;
+      
+      return new Response(encoder.encode(sseMessage), {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
+    }
 
   } catch (error) {
     console.error("Unified AI error:", error);
     
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    // Always return a graceful response, never expose errors
+    const encoder = new TextEncoder();
+    const fallbackData = {
+      id: "error-fallback",
+      object: "chat.completion.chunk",
+      created: Date.now(),
+      model: "fallback",
+      choices: [{
+        index: 0,
+        delta: { content: "I'm having a moment. Please try your question again." },
+        finish_reason: "stop"
+      }]
+    };
     
-    // Check if all providers failed due to rate limits
-    if (errorMessage.includes("Rate limited") || errorMessage.includes("payment")) {
-      return new Response(
-        JSON.stringify({ error: "Delton is taking a break. Please try again later." }),
-        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    const sseMessage = `data: ${JSON.stringify(fallbackData)}\n\ndata: [DONE]\n\n`;
+    
+    return new Response(encoder.encode(sseMessage), {
+      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+    });
   }
 });

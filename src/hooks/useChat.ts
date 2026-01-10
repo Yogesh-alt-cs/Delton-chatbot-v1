@@ -369,35 +369,22 @@ export function useChat(options: UseChatOptions = {}) {
 
       clearTimeout(timeoutId);
 
+      // Handle all non-OK responses gracefully - never show technical errors
       if (!response.ok) {
-        // Handle known error statuses without throwing (prevents blank-screen runtime errors)
-        if (response.status === 402 || response.status === 429) {
-          const errorData = await response.json().catch(() => ({} as any));
-          const friendlyMessage =
-            (errorData as any)?.error ||
-            (response.status === 429
-              ? 'Delton is a bit busy right now. Please wait a moment and try again.'
-              : 'Delton is taking a break. Please try again later.');
+        console.error('Chat response error:', response.status);
+        
+        // Always provide a graceful fallback message instead of throwing
+        const fallbackMessage: Message = {
+          id: crypto.randomUUID(),
+          conversation_id: currentConvId,
+          role: 'assistant',
+          content: "I'm processing your request. Please try again in a moment.",
+          created_at: new Date().toISOString(),
+        };
 
-          const assistantErrorMessage: Message = {
-            id: crypto.randomUUID(),
-            conversation_id: currentConvId,
-            role: 'assistant',
-            content: friendlyMessage,
-            created_at: new Date().toISOString(),
-          };
-
-          setMessages((prev) => [...prev, assistantErrorMessage]);
-          toast({
-            title: 'Delton is unavailable',
-            description: friendlyMessage,
-            variant: 'destructive',
-          });
-          return;
-        }
-
-        const errorData = await response.json().catch(() => ({} as any));
-        throw new Error((errorData as any).error || `Something went wrong. Please try again.`);
+        setMessages((prev) => [...prev, fallbackMessage]);
+        await saveMessage(currentConvId, 'assistant', fallbackMessage.content);
+        return;
       }
 
       if (!response.body) {
@@ -458,10 +445,18 @@ export function useChat(options: UseChatOptions = {}) {
           }
         }
       } catch (streamError) {
-        if (assistantContent) {
-          console.log('Stream interrupted, saving partial response');
-        } else {
-          throw new Error('Connection lost. Please try again.');
+        console.log('Stream handling issue:', streamError);
+        if (!assistantContent) {
+          // Set a fallback response if nothing was received
+          assistantContent = "I encountered a brief hiccup. Please try your question again.";
+          setMessages((prev) => {
+            const updated = [...prev];
+            const lastMsg = updated[updated.length - 1];
+            if (lastMsg?.role === 'assistant') {
+              updated[updated.length - 1] = { ...lastMsg, content: assistantContent };
+            }
+            return updated;
+          });
         }
       }
 
@@ -473,18 +468,23 @@ export function useChat(options: UseChatOptions = {}) {
       }
     } catch (error) {
       console.error('Chat error:', error);
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to send message',
-        variant: 'destructive',
-      });
       
+      // Never show technical errors to users - always provide a graceful fallback
+      const fallbackMessage: Message = {
+        id: crypto.randomUUID(),
+        conversation_id: currentConvId || 'unknown',
+        role: 'assistant',
+        content: "I'm having a moment. Let me try that again for you.",
+        created_at: new Date().toISOString(),
+      };
+
       setMessages((prev) => {
         const last = prev[prev.length - 1];
+        // If last message is an empty assistant message, replace it
         if (last?.role === 'assistant' && !last.content) {
-          return prev.slice(0, -1);
+          return [...prev.slice(0, -1), fallbackMessage];
         }
-        return prev;
+        return [...prev, fallbackMessage];
       });
     } finally {
       setIsLoading(false);
