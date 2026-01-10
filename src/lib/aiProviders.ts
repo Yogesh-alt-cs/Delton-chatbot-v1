@@ -1,6 +1,6 @@
-// AI Provider configuration and types
+// AI Provider configuration - Simplified to Google Gemini only
 
-export type AIProvider = 'lovable' | 'openai' | 'gemini' | 'deepseek';
+export type AIProvider = 'gemini';
 
 export type TaskType = 'text' | 'vision' | 'reasoning' | 'document' | 'search';
 
@@ -14,42 +14,21 @@ export interface ProviderInfo {
 
 export const PROVIDERS: ProviderInfo[] = [
   {
-    id: 'lovable',
-    name: 'Lovable AI',
-    description: 'Default AI with Gemini 3 Pro',
+    id: 'gemini',
+    name: 'Google Gemini',
+    description: 'Multimodal AI with vision, reasoning, and long context',
     capabilities: ['text', 'vision', 'reasoning', 'document', 'search'],
     icon: '✨',
   },
-  {
-    id: 'openai',
-    name: 'OpenAI GPT-4o',
-    description: 'Advanced reasoning and vision',
-    capabilities: ['text', 'vision', 'reasoning', 'document'],
-    icon: '🤖',
-  },
-  {
-    id: 'gemini',
-    name: 'Google Gemini',
-    description: 'Multimodal AI with long context',
-    capabilities: ['text', 'vision', 'reasoning', 'document', 'search'],
-    icon: '🌟',
-  },
-  {
-    id: 'deepseek',
-    name: 'DeepSeek',
-    description: 'Specialized reasoning model',
-    capabilities: ['text', 'reasoning'],
-    icon: '🔍',
-  },
 ];
 
-// Model selection priorities for auto-select mode
-export const TASK_PRIORITIES: Record<TaskType, AIProvider[]> = {
-  vision: ['gemini', 'openai', 'lovable', 'deepseek'],
-  reasoning: ['deepseek', 'gemini', 'lovable', 'openai'],
-  document: ['gemini', 'lovable', 'openai', 'deepseek'],
-  search: ['lovable', 'gemini', 'openai', 'deepseek'],
-  text: ['lovable', 'gemini', 'deepseek', 'openai'],
+// Model selection for different task types
+export const TASK_MODELS: Record<TaskType, string> = {
+  vision: 'gemini-2.0-flash',
+  reasoning: 'gemini-2.5-pro-preview-06-05',
+  document: 'gemini-2.5-pro-preview-06-05',
+  search: 'gemini-2.0-flash',
+  text: 'gemini-2.0-flash',
 };
 
 // Detect task type from message content
@@ -75,6 +54,10 @@ export function detectTaskType(content: string, hasImages: boolean): TaskType {
   return 'text';
 }
 
-export function getProviderForTask(task: TaskType): AIProvider {
-  return TASK_PRIORITIES[task][0];
+export function getModelForTask(task: TaskType): string {
+  return TASK_MODELS[task];
+}
+
+export function getProviderForTask(_task: TaskType): AIProvider {
+  return 'gemini'; // Always use Gemini
 }

@@ -5,8 +5,31 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000;
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Get Google Gemini configuration (primary provider)
+function getGeminiConfig() {
+  const geminiKey = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+  
+  if (geminiKey) {
+    return {
+      url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      headers: {
+        Authorization: `Bearer ${geminiKey}`,
+        "Content-Type": "application/json",
+      },
+      model: "gemini-2.0-flash",
+    };
+  }
+  
+  return null;
+}
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -16,10 +39,29 @@ serve(async (req) => {
     
     console.log("Chat request received:", { conversationId, messageCount: messages?.length });
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY is not configured");
-      throw new Error("AI service is not configured");
+    const config = getGeminiConfig();
+    if (!config) {
+      console.error("GOOGLE_GEMINI_API_KEY is not configured");
+      
+      // Return graceful fallback
+      const encoder = new TextEncoder();
+      const fallbackData = {
+        id: "config-fallback",
+        object: "chat.completion.chunk",
+        created: Date.now(),
+        model: "fallback",
+        choices: [{
+          index: 0,
+          delta: { content: "I'm being set up. Please ensure the Google AI Studio API key is configured." },
+          finish_reason: "stop"
+        }]
+      };
+      
+      const sseMessage = `data: ${JSON.stringify(fallbackData)}\n\ndata: [DONE]\n\n`;
+      
+      return new Response(encoder.encode(sseMessage), {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
     }
 
     // Get current date for context
@@ -57,7 +99,7 @@ serve(async (req) => {
     const userGreeting = userName ? `The user's name is ${userName}. Address them by name occasionally.` : '';
     const styleGuide = styleInstructions[userStyle] || styleInstructions.balanced;
 
-const systemPrompt = `You are Delton 2.0, an advanced multimodal AI agent created by Yogesh GR from Google and launched in 2025. You are designed for 2026 standards - intelligent, autonomous, and capable. ${styleGuide} ${userGreeting}
+    const systemPrompt = `You are Delton 2.0, an advanced multimodal AI agent created by Yogesh GR from Google and launched in 2025. You are designed for 2026 standards - intelligent, autonomous, and capable. ${styleGuide} ${userGreeting}
 
 IDENTITY:
 When asked who created you or who made you, respond: "I'm Delton 2.0, created by Yogesh GR from Google, and launched in 2025. I'm a next-generation AI agent with vision, search, code execution, and memory capabilities."
@@ -87,79 +129,113 @@ AUTONOMOUS BEHAVIOR:
 - When you see "[Code Execution Result]" in the context, explain the output
 - When you see "[USER MEMORY CONTEXT]", personalize your responses accordingly
 
-TIME-SENSITIVE INFORMATION:
-For live search results, cite sources when available. For other time-sensitive topics:
-- Stock/crypto prices: Use search results or acknowledge need for verification
-- News: Reference search results or suggest verification
-- Weather/sports: Suggest live sources if no search results provided
-
 REMINDER FEATURE:
 If the user asks you to remind them about something, extract and include the reminder using this EXACT format:
 [REMINDER: title="what to remind" time="ISO datetime"]
-
-Example: "Remind me in 30 minutes" -> [REMINDER: title="Reminder" time="${new Date(now.getTime() + 30 * 60000).toISOString()}"]
 
 IMPORTANT GUIDELINES:
 - Leverage all context provided (search results, documents, memories)
 - Never fabricate information - use provided context or acknowledge uncertainty
 - Be helpful, be accurate, be Delton 2.0`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-pro-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...filteredMessages,
-        ],
-        stream: true,
-      }),
-    });
+    // Retry logic
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(`Chat attempt ${attempt}/${MAX_RETRIES}`);
+        
+        const response = await fetch(config.url, {
+          method: "POST",
+          headers: config.headers,
+          body: JSON.stringify({
+            model: config.model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              ...filteredMessages,
+            ],
+            stream: true,
+          }),
+        });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Delton is a bit busy. Please wait a moment and try again." }),
-          {
-            status: 429,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
+        if (response.ok) {
+          console.log("Streaming response started");
+          return new Response(response.body, {
+            headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+          });
+        }
+
+        const status = response.status;
+        const errorText = await response.text();
+        console.error(`Chat attempt ${attempt} failed:`, status, errorText);
+
+        if (status === 429) {
+          await sleep(RETRY_DELAY_MS * attempt * 2);
+          lastError = new Error("Rate limited");
+          continue;
+        }
+
+        if (status >= 500) {
+          await sleep(RETRY_DELAY_MS * attempt);
+          lastError = new Error(`Server error: ${status}`);
+          continue;
+        }
+
+        lastError = new Error(`API error: ${status}`);
+        break;
+
+      } catch (err) {
+        console.error(`Chat attempt ${attempt} error:`, err);
+        lastError = err instanceof Error ? err : new Error(String(err));
+        
+        if (attempt < MAX_RETRIES) {
+          await sleep(RETRY_DELAY_MS * attempt);
+        }
       }
-      
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "Delton is taking a break. Please try again later." }),
-          {
-            status: 402,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-      
-      throw new Error(`Something went wrong. Please try again.`);
     }
 
-    console.log("Streaming response started");
-
-    return new Response(response.body, {
+    // Graceful fallback response
+    console.error("All attempts failed, returning fallback");
+    const encoder = new TextEncoder();
+    const fallbackData = {
+      id: "fallback",
+      object: "chat.completion.chunk",
+      created: Date.now(),
+      model: "fallback",
+      choices: [{
+        index: 0,
+        delta: { content: "I'm having a moment. Please try your question again." },
+        finish_reason: "stop"
+      }]
+    };
+    
+    const sseMessage = `data: ${JSON.stringify(fallbackData)}\n\ndata: [DONE]\n\n`;
+    
+    return new Response(encoder.encode(sseMessage), {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
+
   } catch (error) {
     console.error("Chat function error:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    
+    // Always return graceful response
+    const encoder = new TextEncoder();
+    const fallbackData = {
+      id: "error-fallback",
+      object: "chat.completion.chunk",
+      created: Date.now(),
+      model: "fallback",
+      choices: [{
+        index: 0,
+        delta: { content: "I encountered a hiccup. Please try again." },
+        finish_reason: "stop"
+      }]
+    };
+    
+    const sseMessage = `data: ${JSON.stringify(fallbackData)}\n\ndata: [DONE]\n\n`;
+    
+    return new Response(encoder.encode(sseMessage), {
+      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+    });
   }
 });
