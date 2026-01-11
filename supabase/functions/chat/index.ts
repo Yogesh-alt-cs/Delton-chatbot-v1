@@ -11,72 +11,51 @@ const RETRY_DELAY_MS = 1000;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Get Google Gemini configuration
-function getGeminiConfig() {
-  const apiKey = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+// Get Perplexity configuration
+function getPerplexityConfig() {
+  const apiKey = Deno.env.get("PERPLEXITY_API_KEY");
   
   if (!apiKey) {
-    console.error("GOOGLE_GEMINI_API_KEY not found");
+    console.error("PERPLEXITY_API_KEY not found");
     return null;
   }
   
   return {
     apiKey,
-    baseUrl: "https://generativelanguage.googleapis.com/v1beta/models",
-    model: "gemini-2.0-flash",
+    baseUrl: "https://api.perplexity.ai/chat/completions",
+    model: "sonar",
   };
 }
 
-// Convert messages to Gemini format
-function convertToGeminiFormat(messages: any[], systemPrompt: string) {
-  const contents: any[] = [];
+// Convert messages to Perplexity format
+function convertToPerplexityFormat(messages: any[], systemPrompt: string) {
+  const formattedMessages: any[] = [
+    { role: "system", content: systemPrompt }
+  ];
   
   for (const msg of messages) {
-    const role = msg.role === "assistant" ? "model" : "user";
-    
     if (typeof msg.content === "string") {
-      contents.push({
-        role,
-        parts: [{ text: msg.content }]
+      formattedMessages.push({
+        role: msg.role === "assistant" ? "assistant" : "user",
+        content: msg.content
       });
     } else if (Array.isArray(msg.content)) {
-      const parts: any[] = [];
+      // Extract text from multipart content (Perplexity doesn't support images)
+      const textParts = msg.content
+        .filter((part: any) => part.type === "text")
+        .map((part: any) => part.text)
+        .join("\n");
       
-      for (const part of msg.content) {
-        if (part.type === "text") {
-          parts.push({ text: part.text });
-        } else if (part.type === "image_url" && part.image_url?.url) {
-          const url = part.image_url.url;
-          if (url.startsWith("data:")) {
-            const matches = url.match(/^data:([^;]+);base64,(.+)$/);
-            if (matches) {
-              parts.push({
-                inline_data: {
-                  mime_type: matches[1],
-                  data: matches[2]
-                }
-              });
-            }
-          }
-        }
-      }
-      
-      if (parts.length > 0) {
-        contents.push({ role, parts });
+      if (textParts) {
+        formattedMessages.push({
+          role: msg.role === "assistant" ? "assistant" : "user",
+          content: textParts
+        });
       }
     }
   }
   
-  return {
-    system_instruction: { parts: [{ text: systemPrompt }] },
-    contents,
-    generationConfig: {
-      temperature: 0.7,
-      topP: 0.95,
-      topK: 40,
-      maxOutputTokens: 8192,
-    }
-  };
+  return formattedMessages;
 }
 
 // Create SSE response
@@ -86,7 +65,7 @@ function createSSEResponse(content: string, headers: Record<string, string>): Re
     id: `chatcmpl-${Date.now()}`,
     object: "chat.completion.chunk",
     created: Math.floor(Date.now() / 1000),
-    model: "gemini",
+    model: "perplexity",
     choices: [{
       index: 0,
       delta: { content },
@@ -111,11 +90,11 @@ serve(async (req) => {
     
     console.log("Chat request:", { conversationId, messageCount: messages?.length });
 
-    const config = getGeminiConfig();
+    const config = getPerplexityConfig();
     
     if (!config) {
       return createSSEResponse(
-        "I'm being set up. Please ensure the Google AI Studio API key is configured.",
+        "I'm being set up. Please ensure the Perplexity API key is configured.",
         corsHeaders
       );
     }
@@ -141,8 +120,7 @@ Be helpful, accurate, and conversational. Use formatting for readability.`;
       !(m.role === 'system' && (m.content?.startsWith?.('USER_NAME:') || m.content?.startsWith?.('USER_STYLE:')))
     );
 
-    const requestBody = convertToGeminiFormat(filteredMessages, systemPrompt);
-    const url = `${config.baseUrl}/${config.model}:generateContent?key=${config.apiKey}`;
+    const formattedMessages = convertToPerplexityFormat(filteredMessages, systemPrompt);
 
     let lastError = "";
     
@@ -150,27 +128,28 @@ Be helpful, accurate, and conversational. Use formatting for readability.`;
       try {
         console.log(`Chat attempt ${attempt}/${MAX_RETRIES}`);
         
-        const response = await fetch(url, {
+        const response = await fetch(config.baseUrl, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestBody),
+          headers: {
+            "Authorization": `Bearer ${config.apiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: config.model,
+            messages: formattedMessages,
+            temperature: 0.7,
+            max_tokens: 4096,
+          }),
         });
 
         const data = await response.json();
         
         if (response.ok) {
-          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          const text = data.choices?.[0]?.message?.content;
           
           if (text) {
             console.log("Chat success");
             return createSSEResponse(text, corsHeaders);
-          }
-          
-          if (data.candidates?.[0]?.finishReason === "SAFETY") {
-            return createSSEResponse(
-              "I can't respond to that due to content guidelines.",
-              corsHeaders
-            );
           }
           
           lastError = "No content in response";
@@ -178,7 +157,7 @@ Be helpful, accurate, and conversational. Use formatting for readability.`;
         }
 
         const status = response.status;
-        console.error(`Attempt ${attempt} failed:`, status);
+        console.error(`Attempt ${attempt} failed:`, status, data);
 
         if (status === 429) {
           await sleep(RETRY_DELAY_MS * attempt * 2);
@@ -192,7 +171,7 @@ Be helpful, accurate, and conversational. Use formatting for readability.`;
           continue;
         }
 
-        lastError = `API error: ${status}`;
+        lastError = `API error: ${status} - ${JSON.stringify(data)}`;
         break;
         
       } catch (err) {
