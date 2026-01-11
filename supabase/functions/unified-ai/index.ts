@@ -11,192 +11,174 @@ const RETRY_DELAY_MS = 1000;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Get Google Gemini configuration
-function getGeminiConfig() {
-  const apiKey = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+// Get Perplexity configuration
+function getPerplexityConfig() {
+  const apiKey = Deno.env.get("PERPLEXITY_API_KEY");
   
   if (!apiKey) {
-    console.error("GOOGLE_GEMINI_API_KEY not found in environment");
+    console.error("PERPLEXITY_API_KEY not found");
     return null;
   }
   
   return {
     apiKey,
-    baseUrl: "https://generativelanguage.googleapis.com/v1beta/models",
-    models: {
-      fast: "gemini-2.0-flash",
-      pro: "gemini-1.5-pro",
-    },
+    baseUrl: "https://api.perplexity.ai/chat/completions",
+    model: "sonar-pro", // Using pro model for unified-ai endpoint
   };
 }
 
-// Determine task type from messages
-type TaskType = "text" | "vision" | "reasoning" | "document" | "search";
+// Task type detection
+type TaskType = 'text' | 'vision' | 'reasoning' | 'document' | 'search';
 
 function detectTaskType(messages: any[]): TaskType {
-  const lastUserMessage = [...messages].reverse().find(m => m.role === "user");
-  if (!lastUserMessage) return "text";
-
-  const content = lastUserMessage.content;
+  const lastMessage = messages[messages.length - 1];
   
-  // Check for vision (images)
-  if (Array.isArray(content)) {
-    const hasImage = content.some((part: any) => part.type === "image_url");
-    if (hasImage) return "vision";
+  if (!lastMessage) return 'text';
+  
+  // Check for images
+  if (Array.isArray(lastMessage.content)) {
+    const hasImage = lastMessage.content.some((part: any) => 
+      part.type === 'image_url' || part.type === 'image'
+    );
+    if (hasImage) return 'vision';
   }
-
-  const textContent = typeof content === "string" ? content : 
-    content.find((p: any) => p.type === "text")?.text || "";
   
-  const lowerContent = textContent.toLowerCase();
-
-  // Reasoning tasks
-  const reasoningPatterns = [
-    "solve", "calculate", "prove", "derive", "explain step",
-    "math", "physics", "code", "algorithm", "debug",
-    "why does", "how does", "analyze", "evaluate",
-  ];
-  if (reasoningPatterns.some(p => lowerContent.includes(p))) return "reasoning";
-
-  // Document context
-  if (lowerContent.includes("[document content]")) return "document";
-
-  // Search context
-  if (lowerContent.includes("[live search results]")) return "search";
-
-  return "text";
+  const content = typeof lastMessage.content === 'string' 
+    ? lastMessage.content.toLowerCase() 
+    : '';
+  
+  // Check for reasoning/problem-solving
+  if (content.includes('solve') || content.includes('calculate') || 
+      content.includes('explain step') || content.includes('prove')) {
+    return 'reasoning';
+  }
+  
+  // Check for document analysis
+  if (content.includes('document') || content.includes('pdf') || 
+      content.includes('file') || content.includes('analyze this')) {
+    return 'document';
+  }
+  
+  // Check for search/current info
+  if (content.includes('latest') || content.includes('current') || 
+      content.includes('today') || content.includes('news') ||
+      content.includes('search')) {
+    return 'search';
+  }
+  
+  return 'text';
 }
 
-// Convert OpenAI-style messages to Gemini format
-function convertToGeminiFormat(messages: any[], systemPrompt: string) {
-  const contents: any[] = [];
+// Convert messages to Perplexity format
+function convertToPerplexityFormat(messages: any[], systemPrompt: string) {
+  const formattedMessages: any[] = [
+    { role: "system", content: systemPrompt }
+  ];
   
   for (const msg of messages) {
-    const role = msg.role === "assistant" ? "model" : "user";
-    
     if (typeof msg.content === "string") {
-      contents.push({
-        role,
-        parts: [{ text: msg.content }]
+      formattedMessages.push({
+        role: msg.role === "assistant" ? "assistant" : "user",
+        content: msg.content
       });
     } else if (Array.isArray(msg.content)) {
-      const parts: any[] = [];
+      // Extract text from multipart content
+      // Note: Perplexity doesn't support images, so we describe what we'd analyze
+      const textParts: string[] = [];
+      let hasImage = false;
       
       for (const part of msg.content) {
         if (part.type === "text") {
-          parts.push({ text: part.text });
-        } else if (part.type === "image_url" && part.image_url?.url) {
-          // Handle base64 images
-          const url = part.image_url.url;
-          if (url.startsWith("data:")) {
-            const matches = url.match(/^data:([^;]+);base64,(.+)$/);
-            if (matches) {
-              parts.push({
-                inline_data: {
-                  mime_type: matches[1],
-                  data: matches[2]
-                }
-              });
-            }
-          }
+          textParts.push(part.text);
+        } else if (part.type === "image_url" || part.type === "image") {
+          hasImage = true;
         }
       }
       
-      if (parts.length > 0) {
-        contents.push({ role, parts });
+      let finalContent = textParts.join("\n");
+      if (hasImage && !finalContent) {
+        finalContent = "The user shared an image. Please note that I cannot view images directly, but I can help with text-based questions about the image if you describe it.";
+      }
+      
+      if (finalContent) {
+        formattedMessages.push({
+          role: msg.role === "assistant" ? "assistant" : "user",
+          content: finalContent
+        });
       }
     }
   }
   
-  return {
-    system_instruction: { parts: [{ text: systemPrompt }] },
-    contents,
-    generationConfig: {
-      temperature: 0.7,
-      topP: 0.95,
-      topK: 40,
-      maxOutputTokens: 8192,
-    }
-  };
+  return formattedMessages;
 }
 
-// Make request with retry logic
-async function makeGeminiRequest(
-  config: NonNullable<ReturnType<typeof getGeminiConfig>>,
-  model: string,
-  requestBody: any
+// Make Perplexity API request with retry logic
+async function makePerplexityRequest(
+  config: { apiKey: string; baseUrl: string; model: string },
+  messages: any[],
+  taskType: TaskType
 ): Promise<{ success: boolean; text?: string; error?: string }> {
-  const url = `${config.baseUrl}/${model}:generateContent?key=${config.apiKey}`;
-  
   let lastError = "";
+  
+  // Use sonar-reasoning for complex tasks
+  const model = taskType === 'reasoning' ? 'sonar-reasoning' : config.model;
   
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`Gemini API attempt ${attempt}/${MAX_RETRIES} with model: ${model}`);
+      console.log(`Perplexity attempt ${attempt}/${MAX_RETRIES} with model ${model}`);
       
-      const response = await fetch(url, {
+      const response = await fetch(config.baseUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
+        headers: {
+          "Authorization": `Bearer ${config.apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: messages,
+          temperature: 0.7,
+          max_tokens: 4096,
+        }),
       });
 
       const data = await response.json();
       
       if (response.ok) {
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        const text = data.choices?.[0]?.message?.content;
         
         if (text) {
-          console.log(`Success on attempt ${attempt}`);
+          console.log("Perplexity success");
           return { success: true, text };
         }
         
-        // Handle blocked content
-        if (data.candidates?.[0]?.finishReason === "SAFETY") {
-          console.log("Content blocked by safety filters");
-          return { success: true, text: "I can't respond to that request due to content guidelines." };
-        }
-        
-        console.error("No text in response:", JSON.stringify(data).slice(0, 500));
         lastError = "No content in response";
         continue;
       }
 
       const status = response.status;
-      console.error(`Attempt ${attempt} failed:`, status, JSON.stringify(data).slice(0, 500));
+      console.error(`Attempt ${attempt} failed:`, status, data);
 
-      // Rate limit - wait longer
       if (status === 429) {
-        console.log("Rate limited, waiting before retry...");
         await sleep(RETRY_DELAY_MS * attempt * 2);
         lastError = "Rate limited";
         continue;
       }
 
-      // Server error - retry
+      if (status === 401) {
+        return { success: false, error: "Invalid API key" };
+      }
+
       if (status >= 500) {
         await sleep(RETRY_DELAY_MS * attempt);
         lastError = `Server error: ${status}`;
         continue;
       }
 
-      // Client error - check for specific issues
-      if (status === 400) {
-        const errorMessage = data.error?.message || "Bad request";
-        console.error("Bad request error:", errorMessage);
-        lastError = errorMessage;
-        break; // Don't retry bad requests
-      }
-
-      if (status === 401 || status === 403) {
-        console.error("Authentication error - check API key");
-        lastError = "API key issue";
-        break;
-      }
-
       lastError = `API error: ${status}`;
+      break;
       
     } catch (err) {
-      console.error(`Attempt ${attempt} network error:`, err);
+      console.error(`Attempt ${attempt} error:`, err);
       lastError = err instanceof Error ? err.message : String(err);
       
       if (attempt < MAX_RETRIES) {
@@ -204,18 +186,18 @@ async function makeGeminiRequest(
       }
     }
   }
-
+  
   return { success: false, error: lastError };
 }
 
-// Create SSE response for streaming to frontend
-function createSSEResponse(content: string, corsHeaders: Record<string, string>): Response {
+// Create SSE response
+function createSSEResponse(content: string, headers: Record<string, string>): Response {
   const encoder = new TextEncoder();
   const data = {
     id: `chatcmpl-${Date.now()}`,
     object: "chat.completion.chunk",
     created: Math.floor(Date.now() / 1000),
-    model: "gemini",
+    model: "perplexity",
     choices: [{
       index: 0,
       delta: { content },
@@ -226,7 +208,7 @@ function createSSEResponse(content: string, corsHeaders: Record<string, string>)
   const sseMessage = `data: ${JSON.stringify(data)}\n\ndata: [DONE]\n\n`;
   
   return new Response(encoder.encode(sseMessage), {
-    headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+    headers: { ...headers, "Content-Type": "text/event-stream" },
   });
 }
 
@@ -241,28 +223,22 @@ serve(async (req) => {
     console.log("Unified AI request:", { 
       conversationId, 
       messageCount: messages?.length,
-      userName: userName || "not set",
-      userStyle: userStyle || "balanced"
+      userName,
+      userStyle 
     });
 
-    // Get Gemini config
-    const config = getGeminiConfig();
+    const config = getPerplexityConfig();
     
     if (!config) {
-      console.error("Gemini API key not configured");
       return createSSEResponse(
-        "I'm currently being set up. Please ensure the Google AI Studio API key is configured in the project secrets.",
+        "I'm being set up. Please ensure the Perplexity API key is configured.",
         corsHeaders
       );
     }
 
-    // Detect task type and select model
+    // Detect task type
     const taskType = detectTaskType(messages);
-    const model = taskType === "reasoning" || taskType === "document" 
-      ? config.models.pro 
-      : config.models.fast;
-    
-    console.log(`Task type: ${taskType}, Model: ${model}`);
+    console.log("Detected task type:", taskType);
 
     // Build system prompt
     const now = new Date();
@@ -273,68 +249,61 @@ serve(async (req) => {
       hour: '2-digit', minute: '2-digit', timeZoneName: 'short'
     });
 
-    const styleInstructions: Record<string, string> = {
-      balanced: 'Be helpful and conversational.',
-      friendly: 'Be warm, friendly, and casual.',
-      professional: 'Be formal and professional.',
-      concise: 'Be brief and to the point.',
-      detailed: 'Be thorough and comprehensive.',
-    };
+    let systemPrompt = `You are Delton 2.0, an advanced AI assistant created by Yogesh GR from Google, launched in 2025.
 
-    const userGreeting = userName ? `The user's name is ${userName}.` : '';
-    const styleGuide = styleInstructions[userStyle || 'balanced'] || styleInstructions.balanced;
+Current Date: ${currentDate}
+Current Time: ${currentTime}
 
-    const systemPrompt = `You are Delton 2.0, an advanced multimodal AI agent created by Yogesh GR from Google and launched in 2025. ${styleGuide} ${userGreeting}
+## Identity
+- You are Delton, a helpful and knowledgeable AI assistant
+- You have real-time web search capabilities for current information
+- You provide accurate, up-to-date responses
 
-IDENTITY:
-When asked who created you, respond: "I'm Delton 2.0, created by Yogesh GR from Google, launched in 2025."
+## Capabilities
+- Answer questions on any topic
+- Provide real-time information from the web
+- Help with research, analysis, and problem-solving
+- Assist with writing, coding, and creative tasks
 
-CURRENT CONTEXT:
-- Current Date: ${currentDate}
-- Current Time: ${currentTime}
+## Guidelines
+- Be helpful, accurate, and conversational
+- Use formatting (markdown) for readability
+- When providing information, cite sources when relevant
+- If unsure, acknowledge limitations honestly`;
 
-CAPABILITIES:
-1. Vision & Image Understanding
-2. Web Search (when results are provided in context)
-3. Document Analysis
-4. Code Interpretation
-5. Long-Term Memory
+    // Add personalization
+    if (userName) {
+      systemPrompt += `\n\nThe user's name is ${userName}. Address them naturally.`;
+    }
+    if (userStyle) {
+      systemPrompt += `\n\nConversation style preference: ${userStyle}`;
+    }
 
-GUIDELINES:
-- Be confident and accurate
-- Use formatting for readability
-- Never fabricate information
-- Use context provided (search results, documents, memories)
-
-REMINDER FORMAT (when user asks for reminders):
-[REMINDER: title="what" time="ISO datetime"]`;
-
-    // Filter out personalization messages
+    // Filter personalization messages from input
     const filteredMessages = messages.filter((m: any) => 
       !(m.role === 'system' && (m.content?.startsWith?.('USER_NAME:') || m.content?.startsWith?.('USER_STYLE:')))
     );
 
-    // Convert to Gemini format
-    const requestBody = convertToGeminiFormat(filteredMessages, systemPrompt);
+    // Convert to Perplexity format
+    const formattedMessages = convertToPerplexityFormat(filteredMessages, systemPrompt);
 
     // Make request
-    const result = await makeGeminiRequest(config, model, requestBody);
+    const result = await makePerplexityRequest(config, formattedMessages, taskType);
 
     if (result.success && result.text) {
       return createSSEResponse(result.text, corsHeaders);
     }
 
-    // Fallback response on failure
-    console.error("Gemini request failed:", result.error);
+    console.error("Perplexity request failed:", result.error);
     return createSSEResponse(
-      "I'm processing your request. Please try again in a moment.",
+      "I'm having a moment. Please try again.",
       corsHeaders
     );
 
   } catch (error) {
     console.error("Unified AI error:", error);
     return createSSEResponse(
-      "I encountered an issue. Please try your question again.",
+      "I encountered an issue. Please try again.",
       corsHeaders
     );
   }
