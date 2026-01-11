@@ -9,34 +9,28 @@ const corsHeaders = {
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 
-// Sleep utility
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Get Google Gemini configuration (primary and only provider)
+// Get Google Gemini configuration
 function getGeminiConfig() {
-  const geminiKey = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+  const apiKey = Deno.env.get("GOOGLE_GEMINI_API_KEY");
   
-  if (geminiKey) {
-    return {
-      name: "gemini",
-      baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-      apiKey: geminiKey,
-      headers: {
-        Authorization: `Bearer ${geminiKey}`,
-        "Content-Type": "application/json",
-      },
-      models: {
-        fast: "gemini-2.0-flash",
-        pro: "gemini-2.5-pro-preview-06-05",
-        vision: "gemini-2.0-flash",
-      },
-    };
+  if (!apiKey) {
+    console.error("GOOGLE_GEMINI_API_KEY not found in environment");
+    return null;
   }
   
-  return null;
+  return {
+    apiKey,
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/models",
+    models: {
+      fast: "gemini-2.0-flash",
+      pro: "gemini-1.5-pro",
+    },
+  };
 }
 
-// Determine task type from content
+// Determine task type from messages
 type TaskType = "text" | "vision" | "reasoning" | "document" | "search";
 
 function detectTaskType(messages: any[]): TaskType {
@@ -64,93 +58,146 @@ function detectTaskType(messages: any[]): TaskType {
   ];
   if (reasoningPatterns.some(p => lowerContent.includes(p))) return "reasoning";
 
-  // Document context present
+  // Document context
   if (lowerContent.includes("[document content]")) return "document";
 
-  // Search context present
+  // Search context
   if (lowerContent.includes("[live search results]")) return "search";
 
   return "text";
 }
 
-// Select model based on task type
-function selectModel(config: ReturnType<typeof getGeminiConfig>, taskType: TaskType): string {
-  if (!config) return "gemini-2.0-flash";
+// Convert OpenAI-style messages to Gemini format
+function convertToGeminiFormat(messages: any[], systemPrompt: string) {
+  const contents: any[] = [];
   
-  switch (taskType) {
-    case "vision":
-      return config.models.vision;
-    case "reasoning":
-      return config.models.pro;
-    case "document":
-      return config.models.pro;
-    default:
-      return config.models.fast;
+  for (const msg of messages) {
+    const role = msg.role === "assistant" ? "model" : "user";
+    
+    if (typeof msg.content === "string") {
+      contents.push({
+        role,
+        parts: [{ text: msg.content }]
+      });
+    } else if (Array.isArray(msg.content)) {
+      const parts: any[] = [];
+      
+      for (const part of msg.content) {
+        if (part.type === "text") {
+          parts.push({ text: part.text });
+        } else if (part.type === "image_url" && part.image_url?.url) {
+          // Handle base64 images
+          const url = part.image_url.url;
+          if (url.startsWith("data:")) {
+            const matches = url.match(/^data:([^;]+);base64,(.+)$/);
+            if (matches) {
+              parts.push({
+                inline_data: {
+                  mime_type: matches[1],
+                  data: matches[2]
+                }
+              });
+            }
+          }
+        }
+      }
+      
+      if (parts.length > 0) {
+        contents.push({ role, parts });
+      }
+    }
   }
+  
+  return {
+    system_instruction: { parts: [{ text: systemPrompt }] },
+    contents,
+    generationConfig: {
+      temperature: 0.7,
+      topP: 0.95,
+      topK: 40,
+      maxOutputTokens: 8192,
+    }
+  };
 }
 
 // Make request with retry logic
-async function makeRequestWithRetry(
+async function makeGeminiRequest(
   config: NonNullable<ReturnType<typeof getGeminiConfig>>,
   model: string,
-  messages: any[],
-  systemPrompt: string,
-  stream: boolean = true
-): Promise<Response> {
-  let lastError: Error | null = null;
+  requestBody: any
+): Promise<{ success: boolean; text?: string; error?: string }> {
+  const url = `${config.baseUrl}/${model}:generateContent?key=${config.apiKey}`;
+  
+  let lastError = "";
   
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`Attempt ${attempt}/${MAX_RETRIES} with model: ${model}`);
+      console.log(`Gemini API attempt ${attempt}/${MAX_RETRIES} with model: ${model}`);
       
-      const response = await fetch(config.baseUrl, {
+      const response = await fetch(url, {
         method: "POST",
-        headers: config.headers,
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: systemPrompt },
-            ...messages,
-          ],
-          stream,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
       });
 
+      const data = await response.json();
+      
       if (response.ok) {
-        console.log(`Success on attempt ${attempt}`);
-        return response;
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (text) {
+          console.log(`Success on attempt ${attempt}`);
+          return { success: true, text };
+        }
+        
+        // Handle blocked content
+        if (data.candidates?.[0]?.finishReason === "SAFETY") {
+          console.log("Content blocked by safety filters");
+          return { success: true, text: "I can't respond to that request due to content guidelines." };
+        }
+        
+        console.error("No text in response:", JSON.stringify(data).slice(0, 500));
+        lastError = "No content in response";
+        continue;
       }
 
-      // Handle specific error codes
       const status = response.status;
-      const errorText = await response.text();
-      console.error(`Attempt ${attempt} failed:`, status, errorText);
+      console.error(`Attempt ${attempt} failed:`, status, JSON.stringify(data).slice(0, 500));
 
-      // Rate limit - wait longer before retry
+      // Rate limit - wait longer
       if (status === 429) {
         console.log("Rate limited, waiting before retry...");
         await sleep(RETRY_DELAY_MS * attempt * 2);
-        lastError = new Error("Rate limited");
+        lastError = "Rate limited";
         continue;
       }
 
       // Server error - retry
       if (status >= 500) {
         await sleep(RETRY_DELAY_MS * attempt);
-        lastError = new Error(`Server error: ${status}`);
+        lastError = `Server error: ${status}`;
         continue;
       }
 
-      // Client error (400, 401, 403, etc.) - don't retry, throw immediately
-      if (status >= 400 && status < 500) {
-        throw new Error(`API error: ${status}`);
+      // Client error - check for specific issues
+      if (status === 400) {
+        const errorMessage = data.error?.message || "Bad request";
+        console.error("Bad request error:", errorMessage);
+        lastError = errorMessage;
+        break; // Don't retry bad requests
       }
 
-      lastError = new Error(`Unexpected status: ${status}`);
+      if (status === 401 || status === 403) {
+        console.error("Authentication error - check API key");
+        lastError = "API key issue";
+        break;
+      }
+
+      lastError = `API error: ${status}`;
       
     } catch (err) {
-      console.error(`Attempt ${attempt} error:`, err);
-      lastError = err instanceof Error ? err : new Error(String(err));
+      console.error(`Attempt ${attempt} network error:`, err);
+      lastError = err instanceof Error ? err.message : String(err);
       
       if (attempt < MAX_RETRIES) {
         await sleep(RETRY_DELAY_MS * attempt);
@@ -158,33 +205,29 @@ async function makeRequestWithRetry(
     }
   }
 
-  throw lastError || new Error("Request failed after all retries");
+  return { success: false, error: lastError };
 }
 
-// Generate a graceful fallback response
-function generateFallbackResponse(): Response {
-  const fallbackMessage = {
-    id: "fallback",
-    object: "chat.completion",
-    created: Date.now(),
-    model: "fallback",
+// Create SSE response for streaming to frontend
+function createSSEResponse(content: string, corsHeaders: Record<string, string>): Response {
+  const encoder = new TextEncoder();
+  const data = {
+    id: `chatcmpl-${Date.now()}`,
+    object: "chat.completion.chunk",
+    created: Math.floor(Date.now() / 1000),
+    model: "gemini",
     choices: [{
       index: 0,
-      message: {
-        role: "assistant",
-        content: "I'm processing your request. Please give me a moment and try again. If this persists, there might be a temporary service issue."
-      },
+      delta: { content },
       finish_reason: "stop"
     }]
   };
-
-  return new Response(
-    JSON.stringify(fallbackMessage),
-    { 
-      status: 200, 
-      headers: { "Content-Type": "application/json" } 
-    }
-  );
+  
+  const sseMessage = `data: ${JSON.stringify(data)}\n\ndata: [DONE]\n\n`;
+  
+  return new Response(encoder.encode(sseMessage), {
+    headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+  });
 }
 
 serve(async (req) => {
@@ -198,34 +241,28 @@ serve(async (req) => {
     console.log("Unified AI request:", { 
       conversationId, 
       messageCount: messages?.length,
+      userName: userName || "not set",
+      userStyle: userStyle || "balanced"
     });
 
-    // Get Google Gemini config (only provider)
-    const geminiConfig = getGeminiConfig();
+    // Get Gemini config
+    const config = getGeminiConfig();
     
-    if (!geminiConfig) {
-      console.error("GOOGLE_GEMINI_API_KEY not configured");
-      // Return graceful fallback instead of error
-      return new Response(
-        JSON.stringify({
-          choices: [{
-            message: {
-              role: "assistant",
-              content: "I'm currently being set up. Please ensure the Google AI Studio API key is configured."
-            }
-          }]
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    if (!config) {
+      console.error("Gemini API key not configured");
+      return createSSEResponse(
+        "I'm currently being set up. Please ensure the Google AI Studio API key is configured in the project secrets.",
+        corsHeaders
       );
     }
 
-    // Detect task type
+    // Detect task type and select model
     const taskType = detectTaskType(messages);
-    console.log("Detected task type:", taskType);
-
-    // Select appropriate model
-    const model = selectModel(geminiConfig, taskType);
-    console.log("Selected model:", model);
+    const model = taskType === "reasoning" || taskType === "document" 
+      ? config.models.pro 
+      : config.models.fast;
+    
+    console.log(`Task type: ${taskType}, Model: ${model}`);
 
     // Build system prompt
     const now = new Date();
@@ -238,160 +275,67 @@ serve(async (req) => {
 
     const styleInstructions: Record<string, string> = {
       balanced: 'Be helpful and conversational.',
-      friendly: 'Be warm, friendly, and casual. Use a conversational tone.',
-      professional: 'Be formal and professional. Use clear, precise language.',
-      concise: 'Be brief and to the point. Give short, direct answers.',
-      detailed: 'Be thorough and comprehensive. Provide detailed explanations.',
+      friendly: 'Be warm, friendly, and casual.',
+      professional: 'Be formal and professional.',
+      concise: 'Be brief and to the point.',
+      detailed: 'Be thorough and comprehensive.',
     };
 
-    const userGreeting = userName ? `The user's name is ${userName}. Address them by name occasionally.` : '';
+    const userGreeting = userName ? `The user's name is ${userName}.` : '';
     const styleGuide = styleInstructions[userStyle || 'balanced'] || styleInstructions.balanced;
 
-    // Task-specific instructions
-    const taskInstructions: Record<TaskType, string> = {
-      vision: `
-VISION ANALYSIS MODE:
-- Carefully analyze the image(s) provided
-- Describe what you see in detail
-- If it's a diagram/chart, explain it clearly
-- If it's a math problem or text, solve/transcribe it
-- If it's code, analyze and explain it
-- Extract any text (OCR) when relevant`,
-      
-      reasoning: `
-PROBLEM-SOLVING MODE:
-- Break down complex problems step by step
-- Show your work and reasoning clearly
-- For math: write equations and solve systematically
-- For code: explain logic, then provide solution
-- For physics: state principles, apply formulas
-- Give a clear final answer`,
-      
-      document: `
-DOCUMENT ANALYSIS MODE:
-- Use the document content provided in context
-- Answer questions based on the document
-- Quote relevant sections when helpful
-- Summarize or explain concepts as needed`,
-      
-      search: `
-LIVE SEARCH MODE:
-- Use the search results provided in context
-- Cite sources when providing information
-- Synthesize information from multiple sources
-- Acknowledge if information might be time-sensitive`,
-      
-      text: ``,
-    };
-
-    const systemPrompt = `You are Delton 2.0, an advanced multimodal AI agent created by Yogesh GR from Google and launched in 2025. You are designed for 2026 standards - intelligent, autonomous, and capable. ${styleGuide} ${userGreeting}
+    const systemPrompt = `You are Delton 2.0, an advanced multimodal AI agent created by Yogesh GR from Google and launched in 2025. ${styleGuide} ${userGreeting}
 
 IDENTITY:
-When asked who created you or who made you, respond: "I'm Delton 2.0, created by Yogesh GR from Google, and launched in 2025. I'm a next-generation AI agent with vision, search, code execution, and memory capabilities."
+When asked who created you, respond: "I'm Delton 2.0, created by Yogesh GR from Google, launched in 2025."
 
 CURRENT CONTEXT:
 - Current Date: ${currentDate}
 - Current Time: ${currentTime}
 
-CORE CAPABILITIES (Delton 2.0):
-1. **Vision & Image Understanding**: Analyze images, charts, screenshots, documents, math problems
-2. **Autonomous Web Search**: Live search results are provided when queries need real-time data
-3. **Document Analysis**: Process PDFs, DOCX, CSV, TXT files with RAG
-4. **Code Interpreter**: Execute Python code for calculations, data analysis, plots
-5. **Long-Term Memory**: Remember user preferences, names, and context across sessions
-6. **Problem Solving**: Step-by-step solutions for math, physics, coding problems
+CAPABILITIES:
+1. Vision & Image Understanding
+2. Web Search (when results are provided in context)
+3. Document Analysis
+4. Code Interpretation
+5. Long-Term Memory
 
-${taskInstructions[taskType]}
+GUIDELINES:
+- Be confident and accurate
+- Use formatting for readability
+- Never fabricate information
+- Use context provided (search results, documents, memories)
 
-COMMUNICATION STYLE:
-- Be confident and knowledgeable
-- Provide clear, accurate, and actionable responses
-- Use formatting (headers, lists, code blocks) when it improves readability
-- Be concise but thorough - quality over quantity
-- Sound natural and conversational, not robotic
-
-AUTONOMOUS BEHAVIOR:
-- When you see "[Live Search Results]" in the context, use that information in your response
-- When you see "[Document Content]" in the context, answer based on the document
-- When you see "[Code Execution Result]" in the context, explain the output
-- When you see "[USER MEMORY CONTEXT]", personalize your responses accordingly
-
-REMINDER FEATURE:
-If the user asks you to remind them about something, extract and include using this format:
-[REMINDER: title="what to remind" time="ISO datetime"]
-
-IMPORTANT GUIDELINES:
-- Leverage all context provided (search results, documents, memories)
-- Never fabricate information - use provided context or acknowledge uncertainty
-- Be helpful, be accurate, be Delton 2.0`;
+REMINDER FORMAT (when user asks for reminders):
+[REMINDER: title="what" time="ISO datetime"]`;
 
     // Filter out personalization messages
     const filteredMessages = messages.filter((m: any) => 
       !(m.role === 'system' && (m.content?.startsWith?.('USER_NAME:') || m.content?.startsWith?.('USER_STYLE:')))
     );
 
-    try {
-      // Make request with retry logic
-      const response = await makeRequestWithRetry(
-        geminiConfig,
-        model,
-        filteredMessages,
-        systemPrompt,
-        true
-      );
+    // Convert to Gemini format
+    const requestBody = convertToGeminiFormat(filteredMessages, systemPrompt);
 
-      return new Response(response.body, {
-        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-      });
+    // Make request
+    const result = await makeGeminiRequest(config, model, requestBody);
 
-    } catch (apiError) {
-      console.error("API request failed after retries:", apiError);
-      
-      // Return graceful fallback response instead of error
-      const fallbackContent = "I encountered a temporary issue while processing your request. Please try again in a moment.";
-      
-      // Create a simple SSE response with the fallback message
-      const encoder = new TextEncoder();
-      const fallbackData = {
-        id: "fallback",
-        object: "chat.completion.chunk",
-        created: Date.now(),
-        model: "fallback",
-        choices: [{
-          index: 0,
-          delta: { content: fallbackContent },
-          finish_reason: "stop"
-        }]
-      };
-      
-      const sseMessage = `data: ${JSON.stringify(fallbackData)}\n\ndata: [DONE]\n\n`;
-      
-      return new Response(encoder.encode(sseMessage), {
-        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-      });
+    if (result.success && result.text) {
+      return createSSEResponse(result.text, corsHeaders);
     }
+
+    // Fallback response on failure
+    console.error("Gemini request failed:", result.error);
+    return createSSEResponse(
+      "I'm processing your request. Please try again in a moment.",
+      corsHeaders
+    );
 
   } catch (error) {
     console.error("Unified AI error:", error);
-    
-    // Always return a graceful response, never expose errors
-    const encoder = new TextEncoder();
-    const fallbackData = {
-      id: "error-fallback",
-      object: "chat.completion.chunk",
-      created: Date.now(),
-      model: "fallback",
-      choices: [{
-        index: 0,
-        delta: { content: "I'm having a moment. Please try your question again." },
-        finish_reason: "stop"
-      }]
-    };
-    
-    const sseMessage = `data: ${JSON.stringify(fallbackData)}\n\ndata: [DONE]\n\n`;
-    
-    return new Response(encoder.encode(sseMessage), {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-    });
+    return createSSEResponse(
+      "I encountered an issue. Please try your question again.",
+      corsHeaders
+    );
   }
 });

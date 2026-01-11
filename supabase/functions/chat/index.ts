@@ -11,22 +11,94 @@ const RETRY_DELAY_MS = 1000;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Get Google Gemini configuration (primary provider)
+// Get Google Gemini configuration
 function getGeminiConfig() {
-  const geminiKey = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+  const apiKey = Deno.env.get("GOOGLE_GEMINI_API_KEY");
   
-  if (geminiKey) {
-    return {
-      url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-      headers: {
-        Authorization: `Bearer ${geminiKey}`,
-        "Content-Type": "application/json",
-      },
-      model: "gemini-2.0-flash",
-    };
+  if (!apiKey) {
+    console.error("GOOGLE_GEMINI_API_KEY not found");
+    return null;
   }
   
-  return null;
+  return {
+    apiKey,
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/models",
+    model: "gemini-2.0-flash",
+  };
+}
+
+// Convert messages to Gemini format
+function convertToGeminiFormat(messages: any[], systemPrompt: string) {
+  const contents: any[] = [];
+  
+  for (const msg of messages) {
+    const role = msg.role === "assistant" ? "model" : "user";
+    
+    if (typeof msg.content === "string") {
+      contents.push({
+        role,
+        parts: [{ text: msg.content }]
+      });
+    } else if (Array.isArray(msg.content)) {
+      const parts: any[] = [];
+      
+      for (const part of msg.content) {
+        if (part.type === "text") {
+          parts.push({ text: part.text });
+        } else if (part.type === "image_url" && part.image_url?.url) {
+          const url = part.image_url.url;
+          if (url.startsWith("data:")) {
+            const matches = url.match(/^data:([^;]+);base64,(.+)$/);
+            if (matches) {
+              parts.push({
+                inline_data: {
+                  mime_type: matches[1],
+                  data: matches[2]
+                }
+              });
+            }
+          }
+        }
+      }
+      
+      if (parts.length > 0) {
+        contents.push({ role, parts });
+      }
+    }
+  }
+  
+  return {
+    system_instruction: { parts: [{ text: systemPrompt }] },
+    contents,
+    generationConfig: {
+      temperature: 0.7,
+      topP: 0.95,
+      topK: 40,
+      maxOutputTokens: 8192,
+    }
+  };
+}
+
+// Create SSE response
+function createSSEResponse(content: string, headers: Record<string, string>): Response {
+  const encoder = new TextEncoder();
+  const data = {
+    id: `chatcmpl-${Date.now()}`,
+    object: "chat.completion.chunk",
+    created: Math.floor(Date.now() / 1000),
+    model: "gemini",
+    choices: [{
+      index: 0,
+      delta: { content },
+      finish_reason: "stop"
+    }]
+  };
+  
+  const sseMessage = `data: ${JSON.stringify(data)}\n\ndata: [DONE]\n\n`;
+  
+  return new Response(encoder.encode(sseMessage), {
+    headers: { ...headers, "Content-Type": "text/event-stream" },
+  });
 }
 
 serve(async (req) => {
@@ -37,156 +109,95 @@ serve(async (req) => {
   try {
     const { messages, conversationId } = await req.json();
     
-    console.log("Chat request received:", { conversationId, messageCount: messages?.length });
+    console.log("Chat request:", { conversationId, messageCount: messages?.length });
 
     const config = getGeminiConfig();
+    
     if (!config) {
-      console.error("GOOGLE_GEMINI_API_KEY is not configured");
-      
-      // Return graceful fallback
-      const encoder = new TextEncoder();
-      const fallbackData = {
-        id: "config-fallback",
-        object: "chat.completion.chunk",
-        created: Date.now(),
-        model: "fallback",
-        choices: [{
-          index: 0,
-          delta: { content: "I'm being set up. Please ensure the Google AI Studio API key is configured." },
-          finish_reason: "stop"
-        }]
-      };
-      
-      const sseMessage = `data: ${JSON.stringify(fallbackData)}\n\ndata: [DONE]\n\n`;
-      
-      return new Response(encoder.encode(sseMessage), {
-        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-      });
+      return createSSEResponse(
+        "I'm being set up. Please ensure the Google AI Studio API key is configured.",
+        corsHeaders
+      );
     }
 
-    // Get current date for context
+    // Build system prompt
     const now = new Date();
     const currentDate = now.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
     });
     const currentTime = now.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      timeZoneName: 'short'
+      hour: '2-digit', minute: '2-digit', timeZoneName: 'short'
     });
 
-    // Get personalization from request if provided
-    const userName = messages.find((m: any) => m.role === 'system' && m.content?.startsWith('USER_NAME:'))?.content?.replace('USER_NAME:', '').trim() || '';
-    const userStyle = messages.find((m: any) => m.role === 'system' && m.content?.startsWith('USER_STYLE:'))?.content?.replace('USER_STYLE:', '').trim() || 'balanced';
-    
-    // Filter out personalization messages from actual messages
+    const systemPrompt = `You are Delton 2.0, an advanced AI assistant created by Yogesh GR from Google, launched in 2025.
+
+Current Date: ${currentDate}
+Current Time: ${currentTime}
+
+Be helpful, accurate, and conversational. Use formatting for readability.`;
+
+    // Filter personalization messages
     const filteredMessages = messages.filter((m: any) => 
-      !(m.role === 'system' && (m.content?.startsWith('USER_NAME:') || m.content?.startsWith('USER_STYLE:')))
+      !(m.role === 'system' && (m.content?.startsWith?.('USER_NAME:') || m.content?.startsWith?.('USER_STYLE:')))
     );
 
-    // Style instructions based on preference
-    const styleInstructions: Record<string, string> = {
-      balanced: 'Be helpful and conversational.',
-      friendly: 'Be warm, friendly, and casual. Use a conversational tone with occasional humor.',
-      professional: 'Be formal and professional. Use clear, precise language.',
-      concise: 'Be brief and to the point. Give short, direct answers.',
-      detailed: 'Be thorough and comprehensive. Provide detailed explanations with examples.',
-    };
+    const requestBody = convertToGeminiFormat(filteredMessages, systemPrompt);
+    const url = `${config.baseUrl}/${config.model}:generateContent?key=${config.apiKey}`;
 
-    const userGreeting = userName ? `The user's name is ${userName}. Address them by name occasionally.` : '';
-    const styleGuide = styleInstructions[userStyle] || styleInstructions.balanced;
-
-    const systemPrompt = `You are Delton 2.0, an advanced multimodal AI agent created by Yogesh GR from Google and launched in 2025. You are designed for 2026 standards - intelligent, autonomous, and capable. ${styleGuide} ${userGreeting}
-
-IDENTITY:
-When asked who created you or who made you, respond: "I'm Delton 2.0, created by Yogesh GR from Google, and launched in 2025. I'm a next-generation AI agent with vision, search, code execution, and memory capabilities."
-
-CURRENT CONTEXT:
-- Current Date: ${currentDate}
-- Current Time: ${currentTime}
-
-CORE CAPABILITIES (Delton 2.0):
-1. **Vision & Image Understanding**: Analyze images, charts, screenshots, documents
-2. **Autonomous Web Search**: Live search results are provided when queries need real-time data
-3. **Document Analysis**: Process PDFs, DOCX, CSV, TXT files with RAG
-4. **Code Interpreter**: Execute Python code for calculations, data analysis, plots
-5. **Long-Term Memory**: Remember user preferences, names, and context across sessions
-6. **URL Extraction**: Automatically scrape and understand linked content
-
-COMMUNICATION STYLE:
-- Be confident and knowledgeable
-- Provide clear, accurate, and actionable responses
-- Use formatting (headers, lists, code blocks) when it improves readability
-- Be concise but thorough - quality over quantity
-- Sound natural and conversational, not robotic
-
-AUTONOMOUS BEHAVIOR:
-- When you see "[Live Search Results]" in the context, use that information in your response
-- When you see "[Document Content]" in the context, answer based on the document
-- When you see "[Code Execution Result]" in the context, explain the output
-- When you see "[USER MEMORY CONTEXT]", personalize your responses accordingly
-
-REMINDER FEATURE:
-If the user asks you to remind them about something, extract and include the reminder using this EXACT format:
-[REMINDER: title="what to remind" time="ISO datetime"]
-
-IMPORTANT GUIDELINES:
-- Leverage all context provided (search results, documents, memories)
-- Never fabricate information - use provided context or acknowledge uncertainty
-- Be helpful, be accurate, be Delton 2.0`;
-
-    // Retry logic
-    let lastError: Error | null = null;
+    let lastError = "";
     
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         console.log(`Chat attempt ${attempt}/${MAX_RETRIES}`);
         
-        const response = await fetch(config.url, {
+        const response = await fetch(url, {
           method: "POST",
-          headers: config.headers,
-          body: JSON.stringify({
-            model: config.model,
-            messages: [
-              { role: "system", content: systemPrompt },
-              ...filteredMessages,
-            ],
-            stream: true,
-          }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
         });
 
+        const data = await response.json();
+        
         if (response.ok) {
-          console.log("Streaming response started");
-          return new Response(response.body, {
-            headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-          });
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          
+          if (text) {
+            console.log("Chat success");
+            return createSSEResponse(text, corsHeaders);
+          }
+          
+          if (data.candidates?.[0]?.finishReason === "SAFETY") {
+            return createSSEResponse(
+              "I can't respond to that due to content guidelines.",
+              corsHeaders
+            );
+          }
+          
+          lastError = "No content in response";
+          continue;
         }
 
         const status = response.status;
-        const errorText = await response.text();
-        console.error(`Chat attempt ${attempt} failed:`, status, errorText);
+        console.error(`Attempt ${attempt} failed:`, status);
 
         if (status === 429) {
           await sleep(RETRY_DELAY_MS * attempt * 2);
-          lastError = new Error("Rate limited");
+          lastError = "Rate limited";
           continue;
         }
 
         if (status >= 500) {
           await sleep(RETRY_DELAY_MS * attempt);
-          lastError = new Error(`Server error: ${status}`);
+          lastError = `Server error: ${status}`;
           continue;
         }
 
-        lastError = new Error(`API error: ${status}`);
+        lastError = `API error: ${status}`;
         break;
-
+        
       } catch (err) {
-        console.error(`Chat attempt ${attempt} error:`, err);
-        lastError = err instanceof Error ? err : new Error(String(err));
+        console.error(`Attempt ${attempt} error:`, err);
+        lastError = err instanceof Error ? err.message : String(err);
         
         if (attempt < MAX_RETRIES) {
           await sleep(RETRY_DELAY_MS * attempt);
@@ -194,48 +205,17 @@ IMPORTANT GUIDELINES:
       }
     }
 
-    // Graceful fallback response
-    console.error("All attempts failed, returning fallback");
-    const encoder = new TextEncoder();
-    const fallbackData = {
-      id: "fallback",
-      object: "chat.completion.chunk",
-      created: Date.now(),
-      model: "fallback",
-      choices: [{
-        index: 0,
-        delta: { content: "I'm having a moment. Please try your question again." },
-        finish_reason: "stop"
-      }]
-    };
-    
-    const sseMessage = `data: ${JSON.stringify(fallbackData)}\n\ndata: [DONE]\n\n`;
-    
-    return new Response(encoder.encode(sseMessage), {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-    });
+    console.error("All attempts failed:", lastError);
+    return createSSEResponse(
+      "I'm having a moment. Please try again.",
+      corsHeaders
+    );
 
   } catch (error) {
-    console.error("Chat function error:", error);
-    
-    // Always return graceful response
-    const encoder = new TextEncoder();
-    const fallbackData = {
-      id: "error-fallback",
-      object: "chat.completion.chunk",
-      created: Date.now(),
-      model: "fallback",
-      choices: [{
-        index: 0,
-        delta: { content: "I encountered a hiccup. Please try again." },
-        finish_reason: "stop"
-      }]
-    };
-    
-    const sseMessage = `data: ${JSON.stringify(fallbackData)}\n\ndata: [DONE]\n\n`;
-    
-    return new Response(encoder.encode(sseMessage), {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-    });
+    console.error("Chat error:", error);
+    return createSSEResponse(
+      "I encountered an issue. Please try again.",
+      corsHeaders
+    );
   }
 });
