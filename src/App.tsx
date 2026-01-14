@@ -14,6 +14,7 @@ import History from "@/pages/History";
 import Settings from "@/pages/Settings";
 import Profile from "@/pages/Profile";
 import ProfileEdit from "@/pages/ProfileEdit";
+import PRDGenerator from "@/pages/PRDGenerator";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -53,6 +54,14 @@ const App = () => (
                 element={
                   <AuthGuard>
                     <History />
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/prd"
+                element={
+                  <AuthGuard>
+                    <PRDGenerator />
                   </AuthGuard>
                 }
               />
