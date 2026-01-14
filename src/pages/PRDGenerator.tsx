@@ -6,10 +6,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Loader2, Download, Copy, Check } from 'lucide-react';
+import { FileText, Loader2, Download, Copy, Check, FileDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import jsPDF from 'jspdf';
 
 interface PRDFormData {
   productName: string;
@@ -134,7 +135,7 @@ Format the document professionally with clear headings and bullet points where a
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const downloadPRD = () => {
+  const downloadMarkdown = () => {
     const blob = new Blob([generatedPRD], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -144,7 +145,109 @@ Format the document professionally with clear headings and bullet points where a
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success('PRD downloaded!');
+    toast.success('Markdown downloaded!');
+  };
+
+  const downloadPDF = () => {
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    });
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 20;
+    const maxWidth = pageWidth - margin * 2;
+    let yPosition = margin;
+
+    // Title
+    pdf.setFontSize(20);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(`${formData.productName} - PRD`, margin, yPosition);
+    yPosition += 12;
+
+    // Date
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(100);
+    pdf.text(`Generated: ${new Date().toLocaleDateString()}`, margin, yPosition);
+    yPosition += 10;
+    pdf.setTextColor(0);
+
+    // Divider
+    pdf.setDrawColor(200);
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+    yPosition += 10;
+
+    // Content
+    const lines = generatedPRD.split('\n');
+    
+    for (const line of lines) {
+      // Check for page overflow
+      if (yPosition > pageHeight - margin) {
+        pdf.addPage();
+        yPosition = margin;
+      }
+
+      const trimmedLine = line.trim();
+      
+      // Handle headings
+      if (trimmedLine.startsWith('# ')) {
+        yPosition += 5;
+        pdf.setFontSize(16);
+        pdf.setFont('helvetica', 'bold');
+        const text = trimmedLine.replace(/^#+\s*/, '');
+        pdf.text(text, margin, yPosition);
+        yPosition += 8;
+      } else if (trimmedLine.startsWith('## ')) {
+        yPosition += 4;
+        pdf.setFontSize(14);
+        pdf.setFont('helvetica', 'bold');
+        const text = trimmedLine.replace(/^#+\s*/, '');
+        pdf.text(text, margin, yPosition);
+        yPosition += 7;
+      } else if (trimmedLine.startsWith('### ')) {
+        yPosition += 3;
+        pdf.setFontSize(12);
+        pdf.setFont('helvetica', 'bold');
+        const text = trimmedLine.replace(/^#+\s*/, '');
+        pdf.text(text, margin, yPosition);
+        yPosition += 6;
+      } else if (trimmedLine.startsWith('**') && trimmedLine.endsWith('**')) {
+        pdf.setFontSize(11);
+        pdf.setFont('helvetica', 'bold');
+        const text = trimmedLine.replace(/\*\*/g, '');
+        const splitText = pdf.splitTextToSize(text, maxWidth);
+        pdf.text(splitText, margin, yPosition);
+        yPosition += splitText.length * 5 + 2;
+      } else if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('• ')) {
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        const text = '• ' + trimmedLine.replace(/^[-•]\s*/, '');
+        const splitText = pdf.splitTextToSize(text, maxWidth - 5);
+        pdf.text(splitText, margin + 5, yPosition);
+        yPosition += splitText.length * 4.5 + 1;
+      } else if (trimmedLine.match(/^\d+\.\s/)) {
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        const splitText = pdf.splitTextToSize(trimmedLine, maxWidth - 5);
+        pdf.text(splitText, margin + 5, yPosition);
+        yPosition += splitText.length * 4.5 + 1;
+      } else if (trimmedLine) {
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        const cleanText = trimmedLine.replace(/\*\*/g, '').replace(/\*/g, '');
+        const splitText = pdf.splitTextToSize(cleanText, maxWidth);
+        pdf.text(splitText, margin, yPosition);
+        yPosition += splitText.length * 4.5 + 1;
+      } else {
+        yPosition += 3;
+      }
+    }
+
+    pdf.save(`${formData.productName.replace(/\s+/g, '-').toLowerCase()}-prd.pdf`);
+    toast.success('PDF downloaded!');
   };
 
   const resetForm = () => {
@@ -292,11 +395,14 @@ Format the document professionally with clear headings and bullet points where a
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold">Generated PRD</h2>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={copyToClipboard}>
+                    <Button variant="outline" size="sm" onClick={copyToClipboard} title="Copy">
                       {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
-                    <Button variant="outline" size="sm" onClick={downloadPRD}>
+                    <Button variant="outline" size="sm" onClick={downloadMarkdown} title="Download Markdown">
                       <Download className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={downloadPDF} title="Download PDF">
+                      <FileDown className="h-4 w-4" />
                     </Button>
                     <Button variant="outline" size="sm" onClick={resetForm}>
                       New PRD
