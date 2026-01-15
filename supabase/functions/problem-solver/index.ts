@@ -5,61 +5,29 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Get the best reasoning provider
-function getReasoningProvider(): { url: string; headers: Record<string, string>; model: string } | null {
-  // Try DeepSeek first (best for reasoning)
-  const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY");
-  if (deepseekKey) {
-    return {
-      url: "https://api.deepseek.com/chat/completions",
-      headers: {
-        Authorization: `Bearer ${deepseekKey}`,
-        "Content-Type": "application/json",
-      },
-      model: "deepseek-reasoner",
-    };
-  }
+// Retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000;
 
-  // Try Gemini
-  const geminiKey = Deno.env.get("GOOGLE_GEMINI_API_KEY");
-  if (geminiKey) {
-    return {
-      url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-      headers: {
-        Authorization: `Bearer ${geminiKey}`,
-        "Content-Type": "application/json",
-      },
-      model: "gemini-2.5-pro-preview-06-05",
-    };
-  }
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-  // Try OpenAI
-  const openaiKey = Deno.env.get("OPENAI_API_KEY");
-  if (openaiKey) {
-    return {
-      url: "https://api.openai.com/v1/chat/completions",
-      headers: {
-        Authorization: `Bearer ${openaiKey}`,
-        "Content-Type": "application/json",
-      },
-      model: "gpt-4o",
-    };
+// Get Llama 4 Scout configuration via GitHub AI Models
+function getLlamaConfig() {
+  const githubToken = Deno.env.get("GITHUB_TOKEN");
+  
+  if (!githubToken) {
+    console.error("GITHUB_TOKEN not found");
+    return null;
   }
-
-  // Fallback to Lovable AI
-  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-  if (lovableKey) {
-    return {
-      url: "https://ai.gateway.lovable.dev/v1/chat/completions",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "Content-Type": "application/json",
-      },
-      model: "google/gemini-3-pro-preview",
-    };
-  }
-
-  return null;
+  
+  return {
+    url: "https://models.github.ai/inference/chat/completions",
+    headers: {
+      "Authorization": `Bearer ${githubToken}`,
+      "Content-Type": "application/json",
+    },
+    model: "meta/llama-4-scout-17b-16e-instruct",
+  };
 }
 
 serve(async (req) => {
@@ -77,19 +45,19 @@ serve(async (req) => {
       );
     }
 
-    const provider = getReasoningProvider();
-    if (!provider) {
+    const config = getLlamaConfig();
+    if (!config) {
       return new Response(
-        JSON.stringify({ error: "No reasoning-capable AI provider configured" }),
+        JSON.stringify({ error: "Llama 4 Scout is not configured. Please add GITHUB_TOKEN." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("Problem solving with:", provider.model);
+    console.log("Problem solving with Llama 4 Scout");
 
     // Type-specific system prompts
     const typePrompts: Record<string, string> = {
-      math: `You are an expert mathematician. Solve the problem step by step:
+      math: `You are an expert mathematician using Llama 4 Scout. Solve the problem step by step:
 1. Identify what is being asked
 2. List known information
 3. Choose the appropriate method/formula
@@ -97,7 +65,7 @@ serve(async (req) => {
 5. Verify your answer
 6. State the final answer clearly`,
       
-      physics: `You are an expert physicist. Solve the problem systematically:
+      physics: `You are an expert physicist using Llama 4 Scout. Solve the problem systematically:
 1. Identify the physics concepts involved
 2. List given quantities with units
 3. State relevant equations/principles
@@ -105,7 +73,7 @@ serve(async (req) => {
 5. Check units consistency
 6. State the final answer with units`,
       
-      coding: `You are an expert programmer. Solve the problem:
+      coding: `You are an expert programmer using Llama 4 Scout. Solve the problem:
 1. Understand the requirements
 2. Break down the problem
 3. Choose an appropriate algorithm/approach
@@ -113,7 +81,7 @@ serve(async (req) => {
 5. Explain the solution
 6. Discuss time/space complexity`,
       
-      logic: `You are an expert in logical reasoning. Solve step by step:
+      logic: `You are an expert in logical reasoning using Llama 4 Scout. Solve step by step:
 1. Identify premises and conclusion
 2. Determine the type of reasoning
 3. Apply logical rules/principles
@@ -121,7 +89,7 @@ serve(async (req) => {
 5. State the conclusion
 6. Verify the reasoning is valid`,
       
-      general: `You are an expert problem solver. Approach this systematically:
+      general: `You are an expert problem solver using Llama 4 Scout. Approach this systematically:
 1. Understand what is being asked
 2. Break down the problem
 3. Apply relevant knowledge
@@ -136,36 +104,76 @@ serve(async (req) => {
       ? `Solve this problem step by step, showing all work:\n\n${problem}`
       : `Solve this problem (you may show brief steps if helpful):\n\n${problem}`;
 
-    const response = await fetch(provider.url, {
-      method: "POST",
-      headers: provider.headers,
-      body: JSON.stringify({
-        model: provider.model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.1, // Low temperature for accuracy
-        max_tokens: 4096,
-      }),
-    });
+    let lastError = "";
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Problem solver API error:", response.status, errorText);
-      throw new Error(`Problem solving failed: ${response.status}`);
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(`Problem solver attempt ${attempt}/${MAX_RETRIES}`);
+
+        const response = await fetch(config.url, {
+          method: "POST",
+          headers: config.headers,
+          body: JSON.stringify({
+            model: config.model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            temperature: 0.1, // Low temperature for accuracy
+            max_tokens: 4096,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const solution = data.choices?.[0]?.message?.content;
+
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              solution,
+              provider: "llama-4-scout",
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const status = response.status;
+        const errorText = await response.text();
+        console.error(`Attempt ${attempt} failed:`, status, errorText);
+
+        if (status === 429) {
+          await sleep(RETRY_DELAY_MS * attempt * 2);
+          lastError = "Rate limited";
+          continue;
+        }
+
+        if (status >= 500) {
+          await sleep(RETRY_DELAY_MS * attempt);
+          lastError = `Server error: ${status}`;
+          continue;
+        }
+
+        lastError = `API error: ${status}`;
+        break;
+
+      } catch (err) {
+        console.error(`Attempt ${attempt} error:`, err);
+        lastError = err instanceof Error ? err.message : String(err);
+
+        if (attempt < MAX_RETRIES) {
+          await sleep(RETRY_DELAY_MS * attempt);
+        }
+      }
     }
 
-    const data = await response.json();
-    const solution = data.choices?.[0]?.message?.content;
-
+    console.error("All problem solver attempts failed:", lastError);
     return new Response(
       JSON.stringify({ 
-        success: true, 
-        solution,
-        provider: provider.model,
+        success: false, 
+        error: "Problem solving service is temporarily unavailable. Please try again." 
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
   } catch (error) {

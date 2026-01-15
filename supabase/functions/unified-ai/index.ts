@@ -11,19 +11,19 @@ const RETRY_DELAY_MS = 1000;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Get Perplexity configuration
-function getPerplexityConfig() {
-  const apiKey = Deno.env.get("PERPLEXITY_API_KEY");
+// Get Llama 4 Scout configuration via GitHub AI Models
+function getLlamaConfig() {
+  const githubToken = Deno.env.get("GITHUB_TOKEN");
   
-  if (!apiKey) {
-    console.error("PERPLEXITY_API_KEY not found");
+  if (!githubToken) {
+    console.error("GITHUB_TOKEN not found");
     return null;
   }
   
   return {
-    apiKey,
-    baseUrl: "https://api.perplexity.ai/chat/completions",
-    model: "sonar-pro", // Using pro model for unified-ai endpoint
+    apiKey: githubToken,
+    baseUrl: "https://models.github.ai/inference/chat/completions",
+    model: "meta/llama-4-scout-17b-16e-instruct",
   };
 }
 
@@ -69,8 +69,8 @@ function detectTaskType(messages: any[]): TaskType {
   return 'text';
 }
 
-// Convert messages to Perplexity format
-function convertToPerplexityFormat(messages: any[], systemPrompt: string) {
+// Convert messages to OpenAI-compatible format for Llama
+function convertToLlamaFormat(messages: any[], systemPrompt: string) {
   const formattedMessages: any[] = [
     { role: "system", content: systemPrompt }
   ];
@@ -82,28 +82,28 @@ function convertToPerplexityFormat(messages: any[], systemPrompt: string) {
         content: msg.content
       });
     } else if (Array.isArray(msg.content)) {
-      // Extract text from multipart content
-      // Note: Perplexity doesn't support images, so we describe what we'd analyze
-      const textParts: string[] = [];
-      let hasImage = false;
+      // Handle multipart content (text + images)
+      const parts: any[] = [];
       
       for (const part of msg.content) {
         if (part.type === "text") {
-          textParts.push(part.text);
+          parts.push({ type: "text", text: part.text });
         } else if (part.type === "image_url" || part.type === "image") {
-          hasImage = true;
+          // Llama 4 Scout supports vision
+          const imageUrl = part.image_url?.url || part.url || part.image;
+          if (imageUrl) {
+            parts.push({
+              type: "image_url",
+              image_url: { url: imageUrl }
+            });
+          }
         }
       }
       
-      let finalContent = textParts.join("\n");
-      if (hasImage && !finalContent) {
-        finalContent = "The user shared an image. Please note that I cannot view images directly, but I can help with text-based questions about the image if you describe it.";
-      }
-      
-      if (finalContent) {
+      if (parts.length > 0) {
         formattedMessages.push({
           role: msg.role === "assistant" ? "assistant" : "user",
-          content: finalContent
+          content: parts
         });
       }
     }
@@ -112,20 +112,17 @@ function convertToPerplexityFormat(messages: any[], systemPrompt: string) {
   return formattedMessages;
 }
 
-// Make Perplexity API request with retry logic
-async function makePerplexityRequest(
+// Make Llama 4 Scout API request with retry logic
+async function makeLlamaRequest(
   config: { apiKey: string; baseUrl: string; model: string },
   messages: any[],
-  taskType: TaskType
+  _taskType: TaskType
 ): Promise<{ success: boolean; text?: string; error?: string }> {
   let lastError = "";
   
-  // Use sonar-reasoning for complex tasks
-  const model = taskType === 'reasoning' ? 'sonar-reasoning' : config.model;
-  
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`Perplexity attempt ${attempt}/${MAX_RETRIES} with model ${model}`);
+      console.log(`Llama 4 Scout attempt ${attempt}/${MAX_RETRIES}`);
       
       const response = await fetch(config.baseUrl, {
         method: "POST",
@@ -134,7 +131,7 @@ async function makePerplexityRequest(
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: model,
+          model: config.model,
           messages: messages,
           temperature: 0.7,
           max_tokens: 4096,
@@ -147,7 +144,7 @@ async function makePerplexityRequest(
         const text = data.choices?.[0]?.message?.content;
         
         if (text) {
-          console.log("Perplexity success");
+          console.log("Llama 4 Scout success");
           return { success: true, text };
         }
         
@@ -165,7 +162,7 @@ async function makePerplexityRequest(
       }
 
       if (status === 401) {
-        return { success: false, error: "Invalid API key" };
+        return { success: false, error: "Invalid GitHub token" };
       }
 
       if (status >= 500) {
@@ -197,7 +194,7 @@ function createSSEResponse(content: string, headers: Record<string, string>): Re
     id: `chatcmpl-${Date.now()}`,
     object: "chat.completion.chunk",
     created: Math.floor(Date.now() / 1000),
-    model: "perplexity",
+    model: "llama-4-scout",
     choices: [{
       index: 0,
       delta: { content },
@@ -227,11 +224,11 @@ serve(async (req) => {
       userStyle 
     });
 
-    const config = getPerplexityConfig();
+    const config = getLlamaConfig();
     
     if (!config) {
       return createSSEResponse(
-        "I'm being set up. Please ensure the Perplexity API key is configured.",
+        "I'm being set up. Please ensure the GitHub token is configured for Llama 4 Scout.",
         corsHeaders
       );
     }
@@ -249,27 +246,28 @@ serve(async (req) => {
       hour: '2-digit', minute: '2-digit', timeZoneName: 'short'
     });
 
-    let systemPrompt = `You are Delton 2.0, an advanced AI assistant created by Yogesh GR from Google, launched in 2025.
+    let systemPrompt = `You are Delton 2.0, an advanced AI assistant powered by Llama 4 Scout, created by Yogesh GR from Google, launched in 2025.
 
 Current Date: ${currentDate}
 Current Time: ${currentTime}
 
 ## Identity
 - You are Delton, a helpful and knowledgeable AI assistant
-- You have real-time web search capabilities for current information
-- You provide accurate, up-to-date responses
+- You are powered by Llama 4 Scout 17B 16E Instruct model
+- You provide accurate, thoughtful responses
 
 ## Capabilities
 - Answer questions on any topic
-- Provide real-time information from the web
 - Help with research, analysis, and problem-solving
 - Assist with writing, coding, and creative tasks
+- Analyze images and documents when provided
+- Step-by-step reasoning for complex problems
 
 ## Guidelines
 - Be helpful, accurate, and conversational
 - Use formatting (markdown) for readability
-- When providing information, cite sources when relevant
-- If unsure, acknowledge limitations honestly`;
+- If unsure, acknowledge limitations honestly
+- Show your reasoning for complex questions`;
 
     // Add personalization
     if (userName) {
@@ -284,17 +282,17 @@ Current Time: ${currentTime}
       !(m.role === 'system' && (m.content?.startsWith?.('USER_NAME:') || m.content?.startsWith?.('USER_STYLE:')))
     );
 
-    // Convert to Perplexity format
-    const formattedMessages = convertToPerplexityFormat(filteredMessages, systemPrompt);
+    // Convert to Llama format
+    const formattedMessages = convertToLlamaFormat(filteredMessages, systemPrompt);
 
     // Make request
-    const result = await makePerplexityRequest(config, formattedMessages, taskType);
+    const result = await makeLlamaRequest(config, formattedMessages, taskType);
 
     if (result.success && result.text) {
       return createSSEResponse(result.text, corsHeaders);
     }
 
-    console.error("Perplexity request failed:", result.error);
+    console.error("Llama 4 Scout request failed:", result.error);
     return createSSEResponse(
       "I'm having a moment. Please try again.",
       corsHeaders
