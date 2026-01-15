@@ -11,22 +11,23 @@ const RETRY_DELAY_MS = 1000;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Get Google Gemini configuration (primary and only provider)
-function getGeminiConfig() {
-  const geminiKey = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+// Get Llama 4 Scout configuration via GitHub AI Models
+function getLlamaConfig() {
+  const githubToken = Deno.env.get("GITHUB_TOKEN");
   
-  if (geminiKey) {
-    return {
-      url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-      headers: {
-        Authorization: `Bearer ${geminiKey}`,
-        "Content-Type": "application/json",
-      },
-      model: "gemini-2.0-flash",
-    };
+  if (!githubToken) {
+    console.error("GITHUB_TOKEN not found");
+    return null;
   }
   
-  return null;
+  return {
+    url: "https://models.github.ai/inference/chat/completions",
+    headers: {
+      "Authorization": `Bearer ${githubToken}`,
+      "Content-Type": "application/json",
+    },
+    model: "meta/llama-4-scout-17b-16e-instruct",
+  };
 }
 
 serve(async (req) => {
@@ -44,18 +45,18 @@ serve(async (req) => {
       );
     }
 
-    const config = getGeminiConfig();
+    const config = getLlamaConfig();
     if (!config) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: "Vision service is being configured. Please try again shortly." 
+          error: "Vision service is being configured. Please add GITHUB_TOKEN." 
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("Vision analysis with model:", config.model);
+    console.log("Vision analysis with Llama 4 Scout");
 
     // Build analysis-specific prompts
     const analysisPrompts: Record<string, string> = {
@@ -67,7 +68,7 @@ serve(async (req) => {
       document: "Analyze this document. Summarize its content, extract key information, and answer any questions about it.",
     };
 
-    const systemPrompt = `You are an advanced vision AI assistant with the following capabilities:
+    const systemPrompt = `You are Delton 2.0, an advanced vision AI assistant powered by Llama 4 Scout with the following capabilities:
 - Optical Character Recognition (OCR) for text extraction
 - Mathematical problem solving from images
 - Diagram and chart interpretation
@@ -98,11 +99,11 @@ If extracting text, be precise and maintain original formatting.`;
     ];
 
     // Retry logic
-    let lastError: Error | null = null;
+    let lastError = "";
     
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        console.log(`Vision attempt ${attempt}/${MAX_RETRIES}`);
+        console.log(`Vision attempt ${attempt}/${MAX_RETRIES} with Llama 4 Scout`);
         
         const response = await fetch(config.url, {
           method: "POST",
@@ -122,7 +123,7 @@ If extracting text, be precise and maintain original formatting.`;
             JSON.stringify({ 
               success: true, 
               analysis: result,
-              provider: config.model,
+              provider: "llama-4-scout",
             }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
@@ -133,22 +134,22 @@ If extracting text, be precise and maintain original formatting.`;
 
         if (status === 429) {
           await sleep(RETRY_DELAY_MS * attempt * 2);
-          lastError = new Error("Rate limited");
+          lastError = "Rate limited";
           continue;
         }
 
         if (status >= 500) {
           await sleep(RETRY_DELAY_MS * attempt);
-          lastError = new Error(`Server error: ${status}`);
+          lastError = `Server error: ${status}`;
           continue;
         }
 
-        lastError = new Error(`API error: ${status}`);
+        lastError = `API error: ${status}`;
         break;
 
       } catch (err) {
         console.error(`Vision attempt ${attempt} error:`, err);
-        lastError = err instanceof Error ? err : new Error(String(err));
+        lastError = err instanceof Error ? err.message : String(err);
         
         if (attempt < MAX_RETRIES) {
           await sleep(RETRY_DELAY_MS * attempt);
@@ -157,6 +158,7 @@ If extracting text, be precise and maintain original formatting.`;
     }
 
     // Graceful fallback
+    console.error("All vision attempts failed:", lastError);
     return new Response(
       JSON.stringify({ 
         success: true, 

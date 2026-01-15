@@ -1,6 +1,6 @@
-// AI Provider configuration - Simplified to Google Gemini only
+// AI Provider configuration - Llama 4 Scout via GitHub AI Models only
 
-export type AIProvider = 'gemini';
+export type AIProvider = 'llama';
 
 export type TaskType = 'text' | 'vision' | 'reasoning' | 'document' | 'search';
 
@@ -14,21 +14,24 @@ export interface ProviderInfo {
 
 export const PROVIDERS: ProviderInfo[] = [
   {
-    id: 'gemini',
-    name: 'Google Gemini',
-    description: 'Multimodal AI with vision, reasoning, and long context',
+    id: 'llama',
+    name: 'Llama 4 Scout',
+    description: 'Meta Llama 4 Scout 17B 16E Instruct - multimodal AI with vision, reasoning, and long context',
     capabilities: ['text', 'vision', 'reasoning', 'document', 'search'],
-    icon: '✨',
+    icon: '🦙',
   },
 ];
 
-// Model selection for different task types
+// Model configuration - single model for all tasks
+export const LLAMA_MODEL = 'meta/llama-4-scout-17b-16e-instruct';
+
+// Model selection for different task types (all use Llama 4 Scout)
 export const TASK_MODELS: Record<TaskType, string> = {
-  vision: 'gemini-2.0-flash',
-  reasoning: 'gemini-2.5-pro-preview-06-05',
-  document: 'gemini-2.5-pro-preview-06-05',
-  search: 'gemini-2.0-flash',
-  text: 'gemini-2.0-flash',
+  vision: LLAMA_MODEL,
+  reasoning: LLAMA_MODEL,
+  document: LLAMA_MODEL,
+  search: LLAMA_MODEL,
+  text: LLAMA_MODEL,
 };
 
 // Detect task type from message content
@@ -54,10 +57,10 @@ export function detectTaskType(content: string, hasImages: boolean): TaskType {
   return 'text';
 }
 
-export function getModelForTask(task: TaskType): string {
-  return TASK_MODELS[task];
+export function getModelForTask(_task: TaskType): string {
+  return LLAMA_MODEL;
 }
 
 export function getProviderForTask(_task: TaskType): AIProvider {
-  return 'gemini'; // Always use Gemini
+  return 'llama'; // Always use Llama 4 Scout
 }

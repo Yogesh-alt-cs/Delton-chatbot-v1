@@ -11,24 +11,24 @@ const RETRY_DELAY_MS = 1000;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Get Perplexity configuration
-function getPerplexityConfig() {
-  const apiKey = Deno.env.get("PERPLEXITY_API_KEY");
+// Get Llama 4 Scout configuration via GitHub AI Models
+function getLlamaConfig() {
+  const githubToken = Deno.env.get("GITHUB_TOKEN");
   
-  if (!apiKey) {
-    console.error("PERPLEXITY_API_KEY not found");
+  if (!githubToken) {
+    console.error("GITHUB_TOKEN not found");
     return null;
   }
   
   return {
-    apiKey,
-    baseUrl: "https://api.perplexity.ai/chat/completions",
-    model: "sonar",
+    apiKey: githubToken,
+    baseUrl: "https://models.github.ai/inference/chat/completions",
+    model: "meta/llama-4-scout-17b-16e-instruct",
   };
 }
 
-// Convert messages to Perplexity format
-function convertToPerplexityFormat(messages: any[], systemPrompt: string) {
+// Convert messages to OpenAI-compatible format for Llama
+function convertToLlamaFormat(messages: any[], systemPrompt: string) {
   const formattedMessages: any[] = [
     { role: "system", content: systemPrompt }
   ];
@@ -40,7 +40,7 @@ function convertToPerplexityFormat(messages: any[], systemPrompt: string) {
         content: msg.content
       });
     } else if (Array.isArray(msg.content)) {
-      // Extract text from multipart content (Perplexity doesn't support images)
+      // Extract text from multipart content
       const textParts = msg.content
         .filter((part: any) => part.type === "text")
         .map((part: any) => part.text)
@@ -65,7 +65,7 @@ function createSSEResponse(content: string, headers: Record<string, string>): Re
     id: `chatcmpl-${Date.now()}`,
     object: "chat.completion.chunk",
     created: Math.floor(Date.now() / 1000),
-    model: "perplexity",
+    model: "llama-4-scout",
     choices: [{
       index: 0,
       delta: { content },
@@ -90,11 +90,11 @@ serve(async (req) => {
     
     console.log("Chat request:", { conversationId, messageCount: messages?.length });
 
-    const config = getPerplexityConfig();
+    const config = getLlamaConfig();
     
     if (!config) {
       return createSSEResponse(
-        "I'm being set up. Please ensure the Perplexity API key is configured.",
+        "I'm being set up. Please ensure the GitHub token is configured for Llama 4 Scout.",
         corsHeaders
       );
     }
@@ -108,7 +108,7 @@ serve(async (req) => {
       hour: '2-digit', minute: '2-digit', timeZoneName: 'short'
     });
 
-    const systemPrompt = `You are Delton 2.0, an advanced AI assistant created by Yogesh GR from Google, launched in 2025.
+    const systemPrompt = `You are Delton 2.0, an advanced AI assistant powered by Llama 4 Scout, created by Yogesh GR from Google, launched in 2025.
 
 Current Date: ${currentDate}
 Current Time: ${currentTime}
@@ -120,13 +120,13 @@ Be helpful, accurate, and conversational. Use formatting for readability.`;
       !(m.role === 'system' && (m.content?.startsWith?.('USER_NAME:') || m.content?.startsWith?.('USER_STYLE:')))
     );
 
-    const formattedMessages = convertToPerplexityFormat(filteredMessages, systemPrompt);
+    const formattedMessages = convertToLlamaFormat(filteredMessages, systemPrompt);
 
     let lastError = "";
     
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        console.log(`Chat attempt ${attempt}/${MAX_RETRIES}`);
+        console.log(`Chat attempt ${attempt}/${MAX_RETRIES} with Llama 4 Scout`);
         
         const response = await fetch(config.baseUrl, {
           method: "POST",
@@ -148,7 +148,7 @@ Be helpful, accurate, and conversational. Use formatting for readability.`;
           const text = data.choices?.[0]?.message?.content;
           
           if (text) {
-            console.log("Chat success");
+            console.log("Chat success with Llama 4 Scout");
             return createSSEResponse(text, corsHeaders);
           }
           
