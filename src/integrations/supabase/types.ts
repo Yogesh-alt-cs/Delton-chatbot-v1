@@ -182,6 +182,42 @@ export type Database = {
           },
         ]
       }
+      prd_history: {
+        Row: {
+          content: string
+          created_at: string
+          form_data: Json | null
+          id: string
+          product_name: string
+          template_type: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          form_data?: Json | null
+          id?: string
+          product_name: string
+          template_type?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          form_data?: Json | null
+          id?: string
+          product_name?: string
+          template_type?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
