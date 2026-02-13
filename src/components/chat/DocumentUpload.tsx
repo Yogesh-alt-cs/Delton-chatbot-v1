@@ -12,17 +12,17 @@ interface DocumentUploadProps {
 }
 
 const SUPPORTED_TYPES = [
-  'application/pdf',
-  'text/plain',
-  'text/csv',
-  'text/markdown',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-];
+'application/pdf',
+'text/plain',
+'text/csv',
+'text/markdown',
+'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+
 
 const SUPPORTED_EXTENSIONS = ['pdf', 'txt', 'csv', 'md', 'docx'];
 
 export function DocumentUpload({ conversationId, onDocumentProcessed, disabled }: DocumentUploadProps) {
-  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; status: 'uploading' | 'done' | 'error' }[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<{name: string;status: 'uploading' | 'done' | 'error';}[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const { uploadDocument, isProcessing } = useDocumentRAG();
   const { toast } = useToast();
@@ -33,53 +33,53 @@ export function DocumentUpload({ conversationId, onDocumentProcessed, disabled }
 
     for (const file of Array.from(files)) {
       const ext = file.name.split('.').pop()?.toLowerCase();
-      
+
       if (!ext || !SUPPORTED_EXTENSIONS.includes(ext)) {
         toast({
           title: 'Unsupported File',
           description: `${file.name} is not supported. Use PDF, TXT, CSV, MD, or DOCX.`,
-          variant: 'destructive',
+          variant: 'destructive'
         });
         continue;
       }
 
-      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+      if (file.size > 10 * 1024 * 1024) {// 10MB limit
         toast({
           title: 'File Too Large',
           description: `${file.name} exceeds 10MB limit.`,
-          variant: 'destructive',
+          variant: 'destructive'
         });
         continue;
       }
 
-      setUploadedFiles(prev => [...prev, { name: file.name, status: 'uploading' }]);
+      setUploadedFiles((prev) => [...prev, { name: file.name, status: 'uploading' }]);
 
       try {
         const result = await uploadDocument(file, conversationId);
-        
+
         if (result) {
-          setUploadedFiles(prev => 
-            prev.map(f => f.name === file.name ? { ...f, status: 'done' } : f)
+          setUploadedFiles((prev) =>
+          prev.map((f) => f.name === file.name ? { ...f, status: 'done' } : f)
           );
-          
+
           onDocumentProcessed?.(result.fullText, result.fileName);
-          
+
           toast({
             title: 'Document Processed',
-            description: `${file.name} ready (${result.totalChunks} chunks)`,
+            description: `${file.name} ready (${result.totalChunks} chunks)`
           });
         } else {
           throw new Error('Processing failed');
         }
       } catch (error) {
         console.error('Upload error:', error);
-        setUploadedFiles(prev => 
-          prev.map(f => f.name === file.name ? { ...f, status: 'error' } : f)
+        setUploadedFiles((prev) =>
+        prev.map((f) => f.name === file.name ? { ...f, status: 'error' } : f)
         );
         toast({
           title: 'Upload Failed',
           description: `Failed to process ${file.name}`,
-          variant: 'destructive',
+          variant: 'destructive'
         });
       }
     }
@@ -91,7 +91,7 @@ export function DocumentUpload({ conversationId, onDocumentProcessed, disabled }
   };
 
   const removeFile = (fileName: string) => {
-    setUploadedFiles(prev => prev.filter(f => f.name !== fileName));
+    setUploadedFiles((prev) => prev.filter((f) => f.name !== fileName));
   };
 
   return (
@@ -103,58 +103,58 @@ export function DocumentUpload({ conversationId, onDocumentProcessed, disabled }
         multiple
         onChange={handleFileSelect}
         className="hidden"
-        disabled={disabled || isProcessing}
-      />
+        disabled={disabled || isProcessing} />
+
       
       <Button
         variant="outline"
         size="sm"
         onClick={() => inputRef.current?.click()}
         disabled={disabled || isProcessing}
-        className="gap-2"
-      >
-        {isProcessing ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Upload className="h-4 w-4" />
-        )}
+        className="gap-2">
+
+        {isProcessing ?
+        <Loader2 className="h-4 w-4 animate-spin" /> :
+
+        <Upload className="h-4 w-4" />
+        }
         Upload Document
       </Button>
 
-      {uploadedFiles.length > 0 && (
-        <div className="flex flex-wrap gap-2 mt-2">
-          {uploadedFiles.map((file, idx) => (
-            <div
-              key={`${file.name}-${idx}`}
-              className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm",
-                file.status === 'uploading' && "bg-muted text-muted-foreground",
-                file.status === 'done' && "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300",
-                file.status === 'error' && "bg-destructive/20 text-destructive"
-              )}
-            >
-              {file.status === 'uploading' ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <FileText className="h-3 w-3" />
-              )}
+      {uploadedFiles.length > 0 &&
+      <div className="flex flex-wrap gap-2 mt-2">
+          {uploadedFiles.map((file, idx) =>
+        <div
+          key={`${file.name}-${idx}`}
+          className={cn(
+            "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm",
+            file.status === 'uploading' && "bg-muted text-muted-foreground",
+            file.status === 'done' && "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300",
+            file.status === 'error' && "bg-destructive/20 text-destructive"
+          )}>
+
+              {file.status === 'uploading' ?
+          <Loader2 className="h-3 w-3 animate-spin" /> :
+
+          <FileText className="h-3 w-3" />
+          }
               <span className="max-w-[150px] truncate">{file.name}</span>
-              {file.status !== 'uploading' && (
-                <button
-                  onClick={() => removeFile(file.name)}
-                  className="hover:opacity-70"
-                >
+              {file.status !== 'uploading' &&
+          <button
+            onClick={() => removeFile(file.name)}
+            className="hover:opacity-70">
+
                   <X className="h-3 w-3" />
                 </button>
-              )}
+          }
             </div>
-          ))}
+        )}
         </div>
-      )}
+      }
 
-      <p className="text-xs text-muted-foreground">
+      <p className="text-xs text-muted-foreground px-px py-px mx-[2px] my-[2px]">
         Supports PDF, TXT, CSV, MD, DOCX (max 10MB)
       </p>
-    </div>
-  );
+    </div>);
+
 }
