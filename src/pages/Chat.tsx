@@ -233,7 +233,7 @@ export default function Chat() {
             /* Empty State - ChatGPT style centered */
             <div className="flex h-full flex-col items-center justify-center p-8 text-center">
                   <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-secondary-foreground">
-                    <MessageSquareText className="h-10 w-10 text-primary bg-primary px-[3px] py-[3px] my-[2px] mx-[2px]" />
+                    <MessageSquareText className="h-10 w-10 text-primary bg-primary mx-[2px] px-0 py-0 my-0" />
                   </div>
                   <h2 className="mb-2 text-2xl font-semibold">How can I help you today?</h2>
                   <p className="max-w-md text-sm text-muted-foreground mb-6">
