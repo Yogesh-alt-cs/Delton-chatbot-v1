@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, Menu, ArrowDown, Phone, MessageSquare, Sparkles } from 'lucide-react';
+import { Plus, Menu, ArrowDown, Phone, MessageSquare, Sparkles, MessageSquareText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
@@ -28,7 +28,7 @@ export default function Chat() {
   const [mode, setMode] = useState<'text' | 'voice'>('text');
   const [isMicActive, setIsMicActive] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [personalization, setPersonalization] = useState<{ name: string | null; style: string; language: string }>({ name: null, style: 'balanced', language: 'en-US' });
+  const [personalization, setPersonalization] = useState<{name: string | null;style: string;language: string;}>({ name: null, style: 'balanced', language: 'en-US' });
   const [documentContext, setDocumentContext] = useState<string>('');
 
   const { parseAndCreateReminder } = useReminders();
@@ -39,7 +39,7 @@ export default function Chat() {
     conversationId: urlConversationId,
     onConversationCreated: (conversation) => {
       navigate(`/chat/${conversation.id}`, { replace: true });
-    },
+    }
   });
 
   const { feedbackMap, loadFeedback, toggleFeedback } = useFeedback();
@@ -49,7 +49,7 @@ export default function Chat() {
       toast({
         title: "Daily limit reached",
         description: `You've used all ${DAILY_LIMIT} chats for today. Your limit resets at midnight.`,
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
@@ -59,7 +59,7 @@ export default function Chat() {
       toast({
         title: "Daily limit reached",
         description: `You've used all ${DAILY_LIMIT} chats for today. Your limit resets at midnight.`,
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
@@ -76,7 +76,7 @@ export default function Chat() {
     setDocumentContext(content);
     toast({
       title: "Document Ready",
-      description: `${fileName} is ready. Ask questions about it!`,
+      description: `${fileName} is ready. Ask questions about it!`
     });
   }, [toast]);
 
@@ -84,16 +84,16 @@ export default function Chat() {
   useEffect(() => {
     const loadPersonalization = async () => {
       if (!user) return;
-      const { data } = await supabase
-        .from('user_settings')
-        .select('personalization_name, personalization_style, voice_language')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      const { data } = await supabase.
+      from('user_settings').
+      select('personalization_name, personalization_style, voice_language').
+      eq('user_id', user.id).
+      maybeSingle();
       if (data) {
         setPersonalization({
           name: data.personalization_name,
           style: data.personalization_style || 'balanced',
-          language: data.voice_language || 'en-US',
+          language: data.voice_language || 'en-US'
         });
       }
     };
@@ -107,9 +107,9 @@ export default function Chat() {
   }, [urlConversationId, conversationId, loadConversation]);
 
   useEffect(() => {
-    const assistantMessageIds = messages
-      .filter(m => m.role === 'assistant')
-      .map(m => m.id);
+    const assistantMessageIds = messages.
+    filter((m) => m.role === 'assistant').
+    map((m) => m.id);
     if (assistantMessageIds.length > 0) {
       loadFeedback(assistantMessageIds);
     }
@@ -141,7 +141,7 @@ export default function Chat() {
   }, [toggleFeedback]);
 
   const isLastMessageStreaming = isLoading && messages.length > 0 &&
-    messages[messages.length - 1]?.role === 'assistant';
+  messages[messages.length - 1]?.role === 'assistant';
 
   return (
     <div className="flex h-screen bg-background">
@@ -151,8 +151,8 @@ export default function Chat() {
       <ChatSidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        onNewChat={handleNewChat}
-      />
+        onNewChat={handleNewChat} />
+
 
       {/* Main chat area */}
       <div className="flex flex-1 flex-col min-w-0">
@@ -163,8 +163,8 @@ export default function Chat() {
               variant="ghost"
               size="icon"
               className="h-10 w-10 lg:hidden"
-              onClick={() => setSidebarOpen(true)}
-            >
+              onClick={() => setSidebarOpen(true)}>
+
               <Menu className="h-5 w-5" />
             </Button>
             <div className="flex items-center gap-2">
@@ -181,8 +181,8 @@ export default function Chat() {
               variant={mode === 'text' ? 'secondary' : 'ghost'}
               size="sm"
               onClick={() => setMode('text')}
-              className="h-8 gap-1.5 px-3 rounded-full text-xs"
-            >
+              className="h-8 gap-1.5 px-3 rounded-full text-xs">
+
               <MessageSquare className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Text</span>
             </Button>
@@ -190,8 +190,8 @@ export default function Chat() {
               variant={mode === 'voice' ? 'secondary' : 'ghost'}
               size="sm"
               onClick={() => setMode('voice')}
-              className="h-8 gap-1.5 px-3 rounded-full text-xs"
-            >
+              className="h-8 gap-1.5 px-3 rounded-full text-xs">
+
               <Phone className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Voice</span>
             </Button>
@@ -201,87 +201,87 @@ export default function Chat() {
             variant="ghost"
             size="icon"
             className="h-10 w-10"
-            onClick={handleNewChat}
-          >
+            onClick={handleNewChat}>
+
             <Plus className="h-5 w-5" />
           </Button>
         </header>
 
-        {mode === 'voice' ? (
-          <div className="flex flex-1 flex-col items-center justify-center p-8">
+        {mode === 'voice' ?
+        <div className="flex flex-1 flex-col items-center justify-center p-8">
             <VoiceConversation
-              conversationId={conversationId}
-              personalization={personalization}
-              onMicStateChange={setIsMicActive}
-              onMessage={(role, content) => {
-                console.log(`${role}: ${content}`);
-              }}
-            />
+            conversationId={conversationId}
+            personalization={personalization}
+            onMicStateChange={setIsMicActive}
+            onMessage={(role, content) => {
+              console.log(`${role}: ${content}`);
+            }} />
+
             <p className="mt-8 max-w-xs text-center text-sm text-muted-foreground">
               Start a voice conversation with Delton. Speak naturally and Delton will respond with voice.
             </p>
-          </div>
-        ) : (
-          <>
+          </div> :
+
+        <>
             {/* Messages Area */}
             <div
-              ref={scrollContainerRef}
-              className="relative flex-1 overflow-y-auto"
-              onScroll={handleScroll}
-            >
+            ref={scrollContainerRef}
+            className="relative flex-1 overflow-y-auto"
+            onScroll={handleScroll}>
+
               {messages.length === 0 ? (
-                /* Empty State - ChatGPT style centered */
-                <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-                  <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
-                    <Sparkles className="h-10 w-10 text-primary" />
+            /* Empty State - ChatGPT style centered */
+            <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+                  <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-secondary-foreground">
+                    <MessageSquareText className="h-10 w-10 text-primary bg-primary px-[3px] py-[3px] my-[2px] mx-[2px]" />
                   </div>
                   <h2 className="mb-2 text-2xl font-semibold">How can I help you today?</h2>
                   <p className="max-w-md text-sm text-muted-foreground mb-6">
                     I can answer questions, help with analysis, write content, and much more. Upload documents or just start typing.
                   </p>
                   <DocumentUpload
-                    conversationId={conversationId}
-                    onDocumentProcessed={handleDocumentProcessed}
-                    disabled={isLoading}
-                  />
-                </div>
-              ) : (
-                <div className="mx-auto max-w-3xl py-4">
-                  {messages.map((message, index) => (
-                    <MessageBubble
-                      key={message.id}
-                      id={message.id}
-                      role={message.role as 'user' | 'assistant'}
-                      content={message.content}
-                      images={message.images}
-                      isStreaming={
-                        isLastMessageStreaming &&
-                        index === messages.length - 1
-                      }
-                      feedback={feedbackMap[message.id]}
-                      onFeedback={handleFeedback}
-                      showActions={message.role === 'assistant'}
-                    />
-                  ))}
+                conversationId={conversationId}
+                onDocumentProcessed={handleDocumentProcessed}
+                disabled={isLoading} />
+
+                </div>) :
+
+            <div className="mx-auto max-w-3xl py-4">
+                  {messages.map((message, index) =>
+              <MessageBubble
+                key={message.id}
+                id={message.id}
+                role={message.role as 'user' | 'assistant'}
+                content={message.content}
+                images={message.images}
+                isStreaming={
+                isLastMessageStreaming &&
+                index === messages.length - 1
+                }
+                feedback={feedbackMap[message.id]}
+                onFeedback={handleFeedback}
+                showActions={message.role === 'assistant'} />
+
+              )}
                   {isLoading && !isLastMessageStreaming && <TypingIndicator />}
                   <div ref={messagesEndRef} />
                 </div>
-              )}
+            }
 
               {/* Scroll to bottom button */}
-              {showScrollButton && (
-                <Button
-                  size="icon"
-                  variant="secondary"
-                  className={cn(
-                    "absolute bottom-4 left-1/2 -translate-x-1/2 h-9 w-9 rounded-full shadow-lg border border-border",
-                    "transition-all hover:scale-105"
-                  )}
-                  onClick={scrollToBottom}
-                >
+              {showScrollButton &&
+            <Button
+              size="icon"
+              variant="secondary"
+              className={cn(
+                "absolute bottom-4 left-1/2 -translate-x-1/2 h-9 w-9 rounded-full shadow-lg border border-border",
+                "transition-all hover:scale-105"
+              )}
+              onClick={scrollToBottom}>
+
                   <ArrowDown className="h-4 w-4" />
                 </Button>
-              )}
+            }
             </div>
 
             {/* Input Area - ChatGPT style centered */}
@@ -291,8 +291,8 @@ export default function Chat() {
               </div>
             </div>
           </>
-        )}
+        }
       </div>
-    </div>
-  );
+    </div>);
+
 }
