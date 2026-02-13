@@ -232,9 +232,9 @@ export default function Chat() {
               {messages.length === 0 ? (
             /* Empty State - ChatGPT style centered */
             <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-                  <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-secondary-foreground">
-                    <MessageCircle className="h-10 px-0 py-0 my-0 mx-0 w-[40px] bg-primary text-primary" />
-                  </div>
+                  
+
+
                   <h2 className="mb-2 text-2xl font-semibold">How can I help you today?</h2>
                   <p className="max-w-md text-sm text-muted-foreground mb-6">
                     I can answer questions, help with analysis, write content, and much more. Upload documents or just start typing.
