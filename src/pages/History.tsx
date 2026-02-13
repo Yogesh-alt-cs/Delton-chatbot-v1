@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { groupConversationsByDate, formatConversationDate } from '@/lib/dateUtils';
 import { Conversation } from '@/lib/types';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ChatActivityChart } from '@/components/history/ChatActivityChart';
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -420,13 +420,8 @@ export default function History() {
             </div>
           ) : (
             <div className="pb-4">
-              {/* Activity Chart - only show for active tab with data */}
-              {activeTab === 'active' && !searchQuery && (
-                <div className="pt-4">
-                  <ChatActivityChart conversations={conversations} />
-                </div>
-              )}
-              
+
+
               {groupedConversations.map((group) => (
                 <div key={group.label}>
                   <div className="sticky top-0 z-10 bg-background/95 px-4 py-2 backdrop-blur">

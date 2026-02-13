@@ -1,10 +1,9 @@
-import { MessageSquare, Clock, Settings, FileText } from 'lucide-react';
+import { MessageSquare, Clock, Settings } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { path: '/chat', icon: MessageSquare, label: 'Chat' },
-  { path: '/prd', icon: FileText, label: 'PRD' },
   { path: '/history', icon: Clock, label: 'History' },
   { path: '/settings', icon: Settings, label: 'Settings' },
 ];
