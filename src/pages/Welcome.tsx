@@ -31,7 +31,7 @@ export default function Welcome() {
   }, [user, loading, navigate]);
   return <div className="flex min-h-screen flex-col bg-background">
       {/* Hero Section */}
-      <div className="flex flex-1 flex-col items-center justify-center px-6 py-12">
+      <div className="flex-1 flex-col flex items-center justify-center py-[4px] px-[16px] my-[2px] mx-[10px]">
         <div className="mb-8 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary shadow-lg">
           <MessageSquare className="h-10 w-10 text-primary-foreground" />
         </div>
