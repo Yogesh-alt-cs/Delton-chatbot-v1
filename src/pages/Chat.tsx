@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, Menu, ArrowDown, Phone, BotMessageSquare, MessageCircle } from 'lucide-react';
+import { Plus, Menu, ArrowDown, Phone, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
@@ -233,7 +233,7 @@ export default function Chat() {
             /* Empty State - ChatGPT style centered */
             <div className="flex h-full flex-col items-center justify-center p-8 text-center">
                   <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-secondary-foreground">
-                    <BotMessageSquare className="h-10 px-0 py-0 my-0 mx-0 w-[40px] bg-primary text-primary" />
+                    <MessageCircle className="h-10 px-0 py-0 my-0 mx-0 w-[40px] bg-primary text-primary" />
                   </div>
                   <h2 className="mb-2 text-2xl font-semibold">How can I help you today?</h2>
                   <p className="max-w-md text-sm text-muted-foreground mb-6">
