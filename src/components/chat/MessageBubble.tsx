@@ -14,9 +14,9 @@ interface MessageBubbleProps {
   showActions?: boolean;
 }
 
-export function MessageBubble({ 
+export function MessageBubble({
   id,
-  role, 
+  role,
   content,
   images,
   isStreaming,
@@ -30,58 +30,51 @@ export function MessageBubble({
   return (
     <div
       className={cn(
-        "group flex gap-3 px-4 py-3",
-        isUser ? "flex-row-reverse" : "flex-row"
+        "group flex gap-3 px-4 py-4 transition-colors",
+        isUser ? "justify-end" : "justify-start"
       )}
     >
-      {/* Avatar */}
-      <div
-        className={cn(
-          "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-          isUser ? "bg-primary" : "bg-accent"
-        )}
-      >
-        {isUser ? (
-          <User className="h-4 w-4 text-primary-foreground" />
-        ) : (
-          <Bot className="h-4 w-4 text-accent-foreground" />
-        )}
-      </div>
+      {/* AI Avatar - left side */}
+      {isAssistant && (
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
+          <Bot className="h-4 w-4 text-primary" />
+        </div>
+      )}
 
       {/* Message Container */}
-      <div className={cn("flex flex-col gap-1", isUser ? "items-end" : "items-start")}>
+      <div className={cn("flex flex-col gap-1.5 max-w-[80%] sm:max-w-[70%]", isUser ? "items-end" : "items-start")}>
         {/* Images */}
         {images && images.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-2">
+          <div className="flex flex-wrap gap-2 mb-1">
             {images.map((image, index) => (
               <img
                 key={index}
                 src={image.url}
                 alt={`Uploaded ${index + 1}`}
-                className="max-w-[200px] max-h-[200px] rounded-lg object-cover border border-border"
+                className="max-w-[200px] max-h-[200px] rounded-xl object-cover border border-border"
               />
             ))}
           </div>
         )}
-        
+
         {/* Bubble */}
         <div
           className={cn(
-            "max-w-[85%] rounded-2xl px-4 py-2.5",
+            "rounded-2xl px-4 py-3 text-sm leading-relaxed",
             isUser
               ? "bg-primary text-primary-foreground rounded-br-md"
-              : "bg-muted text-foreground rounded-bl-md"
+              : "bg-card text-card-foreground rounded-bl-md border border-border shadow-sm"
           )}
         >
-          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+          <p className="whitespace-pre-wrap break-words">
             {content}
             {isStreaming && (
-              <span className="ml-1 inline-block h-4 w-1 animate-pulse bg-current" />
+              <span className="ml-1 inline-block h-4 w-0.5 animate-pulse bg-current rounded-full" />
             )}
           </p>
         </div>
 
-        {/* Actions (only for assistant messages) */}
+        {/* Actions */}
         {isAssistant && showActions && !isStreaming && content && onFeedback && (
           <MessageActions
             messageId={id}
@@ -91,6 +84,13 @@ export function MessageBubble({
           />
         )}
       </div>
+
+      {/* User Avatar - right side */}
+      {isUser && (
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary mt-0.5">
+          <User className="h-4 w-4 text-primary-foreground" />
+        </div>
+      )}
     </div>
   );
 }
