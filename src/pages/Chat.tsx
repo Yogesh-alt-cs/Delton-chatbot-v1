@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, Menu, ArrowDown, Phone, MessageSquare } from 'lucide-react';
+import { Plus, Menu, ArrowDown, Phone, MessageSquare, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { AppLayout } from '@/components/layout/AppLayout';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { ChatInput } from '@/components/chat/ChatInput';
+import { ChatSidebar } from '@/components/chat/ChatSidebar';
 import { VoiceConversation } from '@/components/chat/VoiceConversation';
 import { MicIndicator } from '@/components/chat/MicIndicator';
 import { DocumentUpload } from '@/components/chat/DocumentUpload';
@@ -27,10 +27,10 @@ export default function Chat() {
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [mode, setMode] = useState<'text' | 'voice'>('text');
   const [isMicActive, setIsMicActive] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [personalization, setPersonalization] = useState<{ name: string | null; style: string; language: string }>({ name: null, style: 'balanced', language: 'en-US' });
   const [documentContext, setDocumentContext] = useState<string>('');
 
-  // Initialize reminders hook for parsing AI responses
   const { parseAndCreateReminder } = useReminders();
   const { remainingChats, isLimitReached, incrementUsage, DAILY_LIMIT } = useDailyLimit();
   const { toast } = useToast();
@@ -44,7 +44,6 @@ export default function Chat() {
 
   const { feedbackMap, loadFeedback, toggleFeedback } = useFeedback();
 
-  // Wrapped send with daily limit check
   const handleSendMessage = useCallback(async (content: string, images?: import('@/lib/types').MessageImage[]) => {
     if (isLimitReached) {
       toast({
@@ -65,7 +64,6 @@ export default function Chat() {
       return;
     }
 
-    // Append document context if available
     let enrichedContent = content;
     if (documentContext) {
       enrichedContent = content + `\n\n[Document Content]\n${documentContext.slice(0, 8000)}\n[End Document]`;
@@ -74,7 +72,6 @@ export default function Chat() {
     await sendMessage(enrichedContent, images);
   }, [isLimitReached, incrementUsage, sendMessage, toast, DAILY_LIMIT, documentContext]);
 
-  // Handle document upload
   const handleDocumentProcessed = useCallback((content: string, fileName: string) => {
     setDocumentContext(content);
     toast({
@@ -87,13 +84,11 @@ export default function Chat() {
   useEffect(() => {
     const loadPersonalization = async () => {
       if (!user) return;
-      
       const { data } = await supabase
         .from('user_settings')
         .select('personalization_name, personalization_style, voice_language')
         .eq('user_id', user.id)
         .maybeSingle();
-      
       if (data) {
         setPersonalization({
           name: data.personalization_name,
@@ -102,38 +97,31 @@ export default function Chat() {
         });
       }
     };
-    
     loadPersonalization();
   }, [user]);
 
-  // Load conversation from URL param
   useEffect(() => {
     if (urlConversationId && urlConversationId !== conversationId) {
       loadConversation(urlConversationId);
     }
   }, [urlConversationId, conversationId, loadConversation]);
 
-  // Load feedback when messages change
   useEffect(() => {
     const assistantMessageIds = messages
       .filter(m => m.role === 'assistant')
       .map(m => m.id);
-    
     if (assistantMessageIds.length > 0) {
       loadFeedback(assistantMessageIds);
     }
   }, [messages, loadFeedback]);
 
-  // Auto-scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Track scroll position
   const handleScroll = () => {
     const container = scrollContainerRef.current;
     if (!container) return;
-    
     const { scrollTop, scrollHeight, clientHeight } = container;
     const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
     setShowScrollButton(!isNearBottom && messages.length > 0);
@@ -152,49 +140,66 @@ export default function Chat() {
     toggleFeedback(messageId, type);
   }, [toggleFeedback]);
 
-  const isLastMessageStreaming = isLoading && messages.length > 0 && 
+  const isLastMessageStreaming = isLoading && messages.length > 0 &&
     messages[messages.length - 1]?.role === 'assistant';
 
   return (
-    <AppLayout>
+    <div className="flex h-screen bg-background">
       <MicIndicator isActive={isMicActive} />
-      <div className="flex h-[calc(100vh-4rem)] flex-col">
+
+      {/* Desktop sidebar */}
+      <ChatSidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onNewChat={handleNewChat}
+      />
+
+      {/* Main chat area */}
+      <div className="flex flex-1 flex-col min-w-0">
         {/* Header */}
-        <header className="flex h-14 items-center justify-between border-b border-border px-4 safe-top">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-10 w-10"
-            onClick={() => navigate('/history')}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-          
+        <header className="flex h-14 items-center justify-between border-b border-border px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 safe-top shrink-0">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 lg:hidden"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                <Sparkles className="h-4 w-4 text-primary" />
+              </div>
+              <span className="font-semibold text-sm hidden sm:inline">Delton AI</span>
+            </div>
+          </div>
+
           {/* Mode Toggle */}
-          <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
+          <div className="flex items-center gap-1 rounded-full bg-muted/50 p-1">
             <Button
               variant={mode === 'text' ? 'secondary' : 'ghost'}
               size="sm"
               onClick={() => setMode('text')}
-              className="h-8 gap-1.5 px-3"
+              className="h-8 gap-1.5 px-3 rounded-full text-xs"
             >
-              <MessageSquare className="h-4 w-4" />
+              <MessageSquare className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Text</span>
             </Button>
             <Button
               variant={mode === 'voice' ? 'secondary' : 'ghost'}
               size="sm"
               onClick={() => setMode('voice')}
-              className="h-8 gap-1.5 px-3"
+              className="h-8 gap-1.5 px-3 rounded-full text-xs"
             >
-              <Phone className="h-4 w-4" />
+              <Phone className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Voice</span>
             </Button>
           </div>
-          
-          <Button 
-            variant="ghost" 
-            size="icon" 
+
+          <Button
+            variant="ghost"
+            size="icon"
             className="h-10 w-10"
             onClick={handleNewChat}
           >
@@ -203,14 +208,12 @@ export default function Chat() {
         </header>
 
         {mode === 'voice' ? (
-          /* Voice Conversation Mode */
           <div className="flex flex-1 flex-col items-center justify-center p-8">
             <VoiceConversation
               conversationId={conversationId}
               personalization={personalization}
               onMicStateChange={setIsMicActive}
               onMessage={(role, content) => {
-                // Messages are handled internally in VoiceConversation
                 console.log(`${role}: ${content}`);
               }}
             />
@@ -221,29 +224,29 @@ export default function Chat() {
         ) : (
           <>
             {/* Messages Area */}
-            <div 
+            <div
               ref={scrollContainerRef}
               className="relative flex-1 overflow-y-auto"
               onScroll={handleScroll}
             >
               {messages.length === 0 ? (
-                /* Empty State */
+                /* Empty State - ChatGPT style centered */
                 <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-                    <span className="text-3xl">👋</span>
+                  <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
+                    <Sparkles className="h-10 w-10 text-primary" />
                   </div>
-                  <h2 className="mb-2 text-xl font-semibold">Welcome to Delton 2.0</h2>
-                  <p className="max-w-xs text-sm text-muted-foreground mb-4">
-                    Start a conversation, upload documents, or switch to voice mode!
+                  <h2 className="mb-2 text-2xl font-semibold">How can I help you today?</h2>
+                  <p className="max-w-md text-sm text-muted-foreground mb-6">
+                    I can answer questions, help with analysis, write content, and much more. Upload documents or just start typing.
                   </p>
-                  <DocumentUpload 
+                  <DocumentUpload
                     conversationId={conversationId}
                     onDocumentProcessed={handleDocumentProcessed}
                     disabled={isLoading}
                   />
                 </div>
               ) : (
-                <div className="py-4">
+                <div className="mx-auto max-w-3xl py-4">
                   {messages.map((message, index) => (
                     <MessageBubble
                       key={message.id}
@@ -252,7 +255,7 @@ export default function Chat() {
                       content={message.content}
                       images={message.images}
                       isStreaming={
-                        isLastMessageStreaming && 
+                        isLastMessageStreaming &&
                         index === messages.length - 1
                       }
                       feedback={feedbackMap[message.id]}
@@ -271,21 +274,25 @@ export default function Chat() {
                   size="icon"
                   variant="secondary"
                   className={cn(
-                    "absolute bottom-4 right-4 h-10 w-10 rounded-full shadow-lg",
+                    "absolute bottom-4 left-1/2 -translate-x-1/2 h-9 w-9 rounded-full shadow-lg border border-border",
                     "transition-all hover:scale-105"
                   )}
                   onClick={scrollToBottom}
                 >
-                  <ArrowDown className="h-5 w-5" />
+                  <ArrowDown className="h-4 w-4" />
                 </Button>
               )}
             </div>
 
-            {/* Input Area */}
-            <ChatInput onSend={handleSendMessage} disabled={isLoading || isLimitReached} onMicStateChange={setIsMicActive} />
+            {/* Input Area - ChatGPT style centered */}
+            <div className="shrink-0 border-t border-border bg-background safe-bottom">
+              <div className="mx-auto max-w-3xl">
+                <ChatInput onSend={handleSendMessage} disabled={isLoading || isLimitReached} onMicStateChange={setIsMicActive} />
+              </div>
+            </div>
           </>
         )}
       </div>
-    </AppLayout>
+    </div>
   );
 }

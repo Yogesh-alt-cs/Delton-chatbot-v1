@@ -129,16 +129,16 @@ export function ImageUploadButton({
         variant="ghost"
         size="icon"
         className={cn(
-          "h-11 w-11 shrink-0 rounded-xl transition-all",
+          "h-9 w-9 shrink-0 rounded-xl transition-all",
           images.length >= maxImages && "opacity-50"
         )}
         onClick={handleClick}
         disabled={disabled || isLoading || images.length >= maxImages}
       >
         {isLoading ? (
-          <Loader2 className="h-5 w-5 animate-spin" />
+          <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
-          <ImagePlus className="h-5 w-5" />
+          <ImagePlus className="h-4 w-4" />
         )}
       </Button>
     </div>

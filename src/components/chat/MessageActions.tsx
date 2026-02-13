@@ -55,7 +55,7 @@ export function MessageActions({
 
   return (
     <TooltipProvider>
-      <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="flex items-center gap-0.5 mt-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 sm:opacity-0 max-sm:opacity-70">
         {/* Copy */}
         <Tooltip>
           <TooltipTrigger asChild>

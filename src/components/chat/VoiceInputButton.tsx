@@ -32,18 +32,18 @@ export function VoiceInputButton({
           <Button
             type="button"
             size="icon"
-            variant={isListening ? "destructive" : "outline"}
+            variant="ghost"
             className={cn(
-              "h-11 w-11 shrink-0 rounded-xl transition-all",
-              isListening && "animate-pulse"
+              "h-9 w-9 shrink-0 rounded-xl transition-all",
+              isListening && "text-destructive bg-destructive/10 animate-pulse"
             )}
             onClick={onClick}
             disabled={disabled}
           >
             {isListening ? (
-              <MicOff className="h-5 w-5" />
+              <MicOff className="h-4 w-4" />
             ) : (
-              <Mic className="h-5 w-5" />
+              <Mic className="h-4 w-4" />
             )}
           </Button>
         </TooltipTrigger>
