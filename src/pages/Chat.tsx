@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, Menu, ArrowDown, Phone, MessageSquare, BotMessageSquare, MessageCircle } from 'lucide-react';
+import { Plus, Menu, ArrowDown, Phone, BotMessageSquare, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
@@ -183,7 +183,7 @@ export default function Chat() {
               onClick={() => setMode('text')}
               className="h-8 gap-1.5 px-3 rounded-full text-xs">
 
-              <MessageSquare className="h-3.5 w-3.5" />
+              <MessageCircle className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Text</span>
             </Button>
             <Button
