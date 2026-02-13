@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, Menu, ArrowDown, Phone, MessageSquare, Sparkles, MessageSquareText } from 'lucide-react';
+import { Plus, Menu, ArrowDown, Phone, MessageSquare, BotMessageSquare, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
@@ -169,7 +169,7 @@ export default function Chat() {
             </Button>
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                <Sparkles className="h-4 w-4 text-primary" />
+                <MessageCircle className="h-4 w-4 text-primary" />
               </div>
               <span className="font-semibold text-sm hidden sm:inline">Delton AI</span>
             </div>
@@ -233,7 +233,7 @@ export default function Chat() {
             /* Empty State - ChatGPT style centered */
             <div className="flex h-full flex-col items-center justify-center p-8 text-center">
                   <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-secondary-foreground">
-                    <MessageSquareText className="h-10 w-10 text-primary bg-primary mx-[2px] px-0 py-0 my-0" />
+                    <BotMessageSquare className="h-10 px-0 py-0 my-0 mx-0 w-[40px] bg-primary text-primary" />
                   </div>
                   <h2 className="mb-2 text-2xl font-semibold">How can I help you today?</h2>
                   <p className="max-w-md text-sm text-muted-foreground mb-6">
