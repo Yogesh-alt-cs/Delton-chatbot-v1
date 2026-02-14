@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, Menu, ArrowDown, Phone, MessageCircle } from 'lucide-react';
+import { Plus, Menu, ArrowDown, Phone, MessageCircle, Download, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
@@ -10,6 +10,7 @@ import { VoiceConversation } from '@/components/chat/VoiceConversation';
 import { MicIndicator } from '@/components/chat/MicIndicator';
 import { DocumentUpload } from '@/components/chat/DocumentUpload';
 import { useChat } from '@/hooks/useChat';
+import { useExportData } from '@/hooks/useExportData';
 import { useFeedback } from '@/hooks/useFeedback';
 import { useReminders } from '@/hooks/useReminders';
 import { useDailyLimit } from '@/hooks/useDailyLimit';
@@ -32,6 +33,7 @@ export default function Chat() {
   const [documentContext, setDocumentContext] = useState<string>('');
 
   const { parseAndCreateReminder } = useReminders();
+  const { exportSingleConversation } = useExportData();
   const { remainingChats, isLimitReached, incrementUsage, DAILY_LIMIT } = useDailyLimit();
   const { toast } = useToast();
 
@@ -197,14 +199,36 @@ export default function Chat() {
             </Button>
           </div>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-10 w-10"
-            onClick={handleNewChat}>
-
-            <Plus className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            {conversationId && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10"
+                onClick={() => exportSingleConversation(conversationId, 'pdf')}
+                title="Download as PDF"
+              >
+                <Download className="h-5 w-5" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 hidden lg:flex"
+              onClick={() => navigate('/settings')}
+              title="Settings"
+            >
+              <Settings className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10"
+              onClick={handleNewChat}
+            >
+              <Plus className="h-5 w-5" />
+            </Button>
+          </div>
         </header>
 
         {mode === 'voice' ?

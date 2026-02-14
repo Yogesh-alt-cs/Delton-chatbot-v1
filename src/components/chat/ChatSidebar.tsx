@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, MessageSquare, Trash2, X, Search, Loader2 } from 'lucide-react';
+import { Plus, MessageSquare, Trash2, X, Search, Loader2, Settings, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useConversations } from '@/hooks/useConversations';
+import { useExportData } from '@/hooks/useExportData';
 import { formatConversationDate } from '@/lib/dateUtils';
 import { Conversation } from '@/lib/types';
 
@@ -18,6 +19,7 @@ export function ChatSidebar({ isOpen, onClose, onNewChat }: ChatSidebarProps) {
   const navigate = useNavigate();
   const { conversationId } = useParams();
   const { conversations, isLoading, deletingIds, deleteConversation, searchConversations } = useConversations();
+  const { exportSingleConversation } = useExportData();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Conversation[] | null>(null);
 
@@ -43,6 +45,11 @@ export function ChatSidebar({ isOpen, onClose, onNewChat }: ChatSidebarProps) {
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     await deleteConversation(id);
+  };
+
+  const handleDownloadPdf = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    exportSingleConversation(id, 'pdf');
   };
 
   return (
@@ -96,7 +103,7 @@ export function ChatSidebar({ isOpen, onClose, onNewChat }: ChatSidebarProps) {
         </div>
 
         {/* Conversation list */}
-        <div className="flex-1 overflow-y-auto px-2 pb-4">
+        <div className="flex-1 overflow-y-auto px-2 pb-20">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -134,22 +141,43 @@ export function ChatSidebar({ isOpen, onClose, onNewChat }: ChatSidebarProps) {
                         {formatConversationDate(conv.updated_at)}
                       </p>
                     </div>
-                    <button
-                      onClick={(e) => handleDelete(e, conv.id)}
-                      className="opacity-0 group-hover:opacity-100 shrink-0 p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-all"
-                      disabled={isDeleting}
-                    >
-                      {isDeleting ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-3.5 w-3.5" />
-                      )}
-                    </button>
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 shrink-0 transition-all">
+                      <button
+                        onClick={(e) => handleDownloadPdf(e, conv.id)}
+                        className="p-1 rounded hover:bg-primary/10 hover:text-primary transition-all"
+                        title="Download as PDF"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => handleDelete(e, conv.id)}
+                        className="p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-all"
+                        disabled={isDeleting}
+                      >
+                        {isDeleting ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    </div>
                   </button>
                 );
               })}
             </div>
           )}
+        </div>
+
+        {/* Settings button at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 border-t border-border bg-card p-3">
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-2 h-10 text-sm text-muted-foreground hover:text-foreground"
+            onClick={() => { navigate('/settings'); onClose(); }}
+          >
+            <Settings className="h-4 w-4" />
+            Settings
+          </Button>
         </div>
       </aside>
     </>
