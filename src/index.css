@@ -177,4 +177,25 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  /* Voice orb glow */
+  .voice-orb-glow {
+    box-shadow: 0 0 40px 10px hsl(var(--primary) / 0.3),
+                0 0 80px 20px hsl(var(--primary) / 0.15),
+                0 0 120px 40px hsl(var(--primary) / 0.05);
+  }
+
+  .voice-orb-glow-active {
+    box-shadow: 0 0 50px 15px hsl(var(--primary) / 0.45),
+                0 0 100px 30px hsl(var(--primary) / 0.25),
+                0 0 150px 50px hsl(var(--primary) / 0.1);
+  }
+
+  /* Glassmorphism */
+  .glass-panel {
+    background: hsl(var(--card) / 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid hsl(var(--border) / 0.5);
+  }
 }

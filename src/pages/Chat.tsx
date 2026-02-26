@@ -184,9 +184,6 @@ export default function Chat() {
                 onMessage={(role, content) => console.log(`${role}: ${content}`)}
               />
             </Suspense>
-            <p className="mt-8 max-w-xs text-center text-sm text-muted-foreground">
-              Start a voice conversation with Delton. Speak naturally and Delton will respond with voice.
-            </p>
           </div>
         ) : (
           <>

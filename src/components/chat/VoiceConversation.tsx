@@ -1,9 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Volume2, VolumeX, Loader2, Phone, PhoneOff } from 'lucide-react';
+import { Mic, MicOff, Volume2, Loader2, PhoneOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useElevenLabsTTS } from '@/hooks/useElevenLabsTTS';
+import { VoiceOrb } from './VoiceOrb';
 
 // Web Speech API types
 interface SpeechRecognitionEvent extends Event {
@@ -60,32 +62,12 @@ interface VoiceConversationProps {
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
-function WaveAnimation({ isActive }: { isActive: boolean }) {
-  return (
-    <div className="flex items-center justify-center gap-1 h-8">
-      {[...Array(5)].map((_, i) => (
-        <div
-          key={i}
-          className={cn(
-            "w-1 bg-emerald-500 rounded-full transition-all duration-150",
-            isActive ? "animate-wave" : "h-1"
-          )}
-          style={{
-            animationDelay: `${i * 0.1}s`,
-            height: isActive ? undefined : '4px',
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-export function VoiceConversation({ 
-  onMessage, 
+export function VoiceConversation({
+  onMessage,
   onSaveMessage,
   conversationId,
   personalization = { name: null, style: 'balanced', language: 'en-US' },
-  onMicStateChange
+  onMicStateChange,
 }: VoiceConversationProps) {
   const [isActive, setIsActive] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -94,12 +76,11 @@ export function VoiceConversation({
   const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
-  
+
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const shouldRestartRef = useRef(false);
   const { toast } = useToast();
-  
-  // Use ElevenLabs TTS
+
   const { speak: elevenLabsSpeak, stop: stopSpeaking, isSpeaking, isLoading: ttsLoading } = useElevenLabsTTS();
 
   useEffect(() => {
@@ -112,27 +93,18 @@ export function VoiceConversation({
   }, [isListening, onMicStateChange]);
 
   const speakText = useCallback(async (text: string): Promise<void> => {
-    // Try ElevenLabs first, fall back to Web Speech API
     const success = await elevenLabsSpeak(text);
-    
     if (!success) {
-      // Fallback to Web Speech API
       if (!('speechSynthesis' in window)) return;
-      
       speechSynthesis.cancel();
-      
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1;
       utterance.pitch = 1;
       utterance.volume = 1;
-      
       const voices = speechSynthesis.getVoices();
-      const englishVoice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) 
+      const englishVoice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google'))
         || voices.find(v => v.lang.startsWith('en'));
-      if (englishVoice) {
-        utterance.voice = englishVoice;
-      }
-      
+      if (englishVoice) utterance.voice = englishVoice;
       return new Promise((resolve) => {
         utterance.onend = () => resolve();
         utterance.onerror = () => resolve();
@@ -143,12 +115,11 @@ export function VoiceConversation({
 
   const sendToAI = useCallback(async (userMessage: string) => {
     setIsProcessing(true);
-    
     const newMessages: Message[] = [...messages, { role: 'user', content: userMessage }];
     setMessages(newMessages);
     onMessage?.('user', userMessage);
     onSaveMessage?.('user', userMessage);
-    
+
     try {
       const chatMessages = [
         ...(personalization.name ? [{ role: 'system' as const, content: `USER_NAME:${personalization.name}` }] : []),
@@ -162,23 +133,16 @@ export function VoiceConversation({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({
-          messages: chatMessages,
-          conversationId,
-        }),
+        body: JSON.stringify({ messages: chatMessages, conversationId }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        if (response.status === 402) {
-          throw new Error('Delton is taking a break. Please try again later.');
-        }
+        if (response.status === 402) throw new Error('Delton is taking a break. Please try again later.');
         throw new Error(errorData.error || 'Something went wrong. Please try again.');
       }
 
-      if (!response.body) {
-        throw new Error('No response body');
-      }
+      if (!response.body) throw new Error('No response body');
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -188,27 +152,20 @@ export function VoiceConversation({
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
         textBuffer += decoder.decode(value, { stream: true });
-
         let newlineIndex: number;
         while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
           let line = textBuffer.slice(0, newlineIndex);
           textBuffer = textBuffer.slice(newlineIndex + 1);
-
           if (line.endsWith('\r')) line = line.slice(0, -1);
           if (line.startsWith(':') || line.trim() === '') continue;
           if (!line.startsWith('data: ')) continue;
-
           const jsonStr = line.slice(6).trim();
           if (jsonStr === '[DONE]') break;
-
           try {
             const parsed = JSON.parse(jsonStr);
             const delta = parsed.choices?.[0]?.delta?.content;
-            if (delta) {
-              assistantContent += delta;
-            }
+            if (delta) assistantContent += delta;
           } catch {
             textBuffer = line + '\n' + textBuffer;
             break;
@@ -220,17 +177,11 @@ export function VoiceConversation({
         setMessages(prev => [...prev, { role: 'assistant', content: assistantContent }]);
         onMessage?.('assistant', assistantContent);
         onSaveMessage?.('assistant', assistantContent);
-        
-        // Speak using ElevenLabs
         await speakText(assistantContent);
       }
     } catch (error) {
       console.error('AI error:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to get AI response',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Failed to get AI response', variant: 'destructive' });
     } finally {
       setIsProcessing(false);
     }
@@ -238,23 +189,11 @@ export function VoiceConversation({
 
   const startListening = useCallback(() => {
     const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    
-    if (!SpeechRecognitionClass) {
-      console.error('Speech recognition not supported');
-      return;
-    }
-    
-    if (isSpeaking || isProcessing) {
-      console.log('Cannot start listening: speaking or processing');
-      return;
-    }
+    if (!SpeechRecognitionClass) return;
+    if (isSpeaking || isProcessing) return;
 
     if (recognitionRef.current) {
-      try {
-        recognitionRef.current.abort();
-      } catch (e) {
-        // Ignore
-      }
+      try { recognitionRef.current.abort(); } catch {}
       recognitionRef.current = null;
     }
 
@@ -267,7 +206,6 @@ export function VoiceConversation({
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interim = '';
-      
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         if (result.isFinal) {
@@ -276,11 +214,8 @@ export function VoiceConversation({
           interim += result[0].transcript;
         }
       }
-      
       setInterimTranscript(interim);
-      
       if (finalTranscript.trim()) {
-        console.log('Final transcript:', finalTranscript.trim());
         setTranscript(finalTranscript.trim());
         setInterimTranscript('');
         const messageToSend = finalTranscript.trim();
@@ -293,74 +228,37 @@ export function VoiceConversation({
       console.error('Speech recognition error:', event.error);
       setIsListening(false);
       setInterimTranscript('');
-      
       if (event.error === 'no-speech') {
-        console.log('No speech detected, restarting...');
         if (shouldRestartRef.current && !isProcessing && !isSpeaking) {
-          setTimeout(() => {
-            if (shouldRestartRef.current) {
-              startListening();
-            }
-          }, 300);
+          setTimeout(() => { if (shouldRestartRef.current) startListening(); }, 300);
         }
-      } else if (event.error === 'aborted') {
-        console.log('Recognition aborted');
       } else if (event.error === 'audio-capture') {
-        toast({
-          title: 'Microphone Busy',
-          description: 'Another app or feature is using your microphone. Close it and try again.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Microphone Busy', description: 'Another app is using your microphone.', variant: 'destructive' });
         shouldRestartRef.current = false;
         setIsActive(false);
-      } else if (event.error === 'network') {
-        toast({
-          title: 'Network Error',
-          description: 'Please check your internet connection.',
-          variant: 'destructive',
-        });
       } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-        toast({
-          title: 'Microphone Blocked',
-          description: 'Please allow microphone access in your browser.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Microphone Blocked', description: 'Please allow microphone access.', variant: 'destructive' });
         shouldRestartRef.current = false;
         setIsActive(false);
       }
     };
 
     recognition.onend = () => {
-      console.log('Recognition ended, isActive:', shouldRestartRef.current);
       setIsListening(false);
-      
       if (shouldRestartRef.current && !isProcessing && !isSpeaking) {
-        setTimeout(() => {
-          if (shouldRestartRef.current && !isProcessing && !isSpeaking) {
-            console.log('Auto-restarting listening...');
-            startListening();
-          }
-        }, 300);
+        setTimeout(() => { if (shouldRestartRef.current && !isProcessing && !isSpeaking) startListening(); }, 300);
       }
     };
 
     recognitionRef.current = recognition;
-    
     try {
       recognition.start();
-      console.log('Recognition started successfully');
       setIsListening(true);
       setInterimTranscript('');
-    } catch (error) {
-      console.error('Failed to start recognition:', error);
+    } catch {
       setIsListening(false);
-      
       if (shouldRestartRef.current) {
-        setTimeout(() => {
-          if (shouldRestartRef.current) {
-            startListening();
-          }
-        }, 500);
+        setTimeout(() => { if (shouldRestartRef.current) startListening(); }, 500);
       }
     }
   }, [isSpeaking, isProcessing, sendToAI, toast, personalization.language]);
@@ -393,124 +291,138 @@ export function VoiceConversation({
 
   if (!isSupported) {
     return (
-      <div className="w-full max-w-md rounded-2xl border border-border bg-muted/30 p-4 text-center">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-card/50 p-6 text-center">
         <p className="text-sm text-muted-foreground">
-          Voice mode isn't supported in this browser. Please try Chrome (Android/Desktop).
+          Voice mode isn't supported in this browser. Please try Chrome.
         </p>
       </div>
     );
   }
 
   const displayText = interimTranscript || transcript;
+  const statusLabel = isListening
+    ? 'Listening...'
+    : isProcessing || ttsLoading
+    ? 'Thinking...'
+    : isSpeaking
+    ? 'Speaking...'
+    : 'Tap to start';
 
   return (
-    <div className="flex flex-col items-center gap-6 w-full max-w-md">
-      {isActive ? (
-        <>
-          <div className="w-full min-h-[120px] rounded-2xl bg-muted/50 border border-border p-4 flex flex-col items-center justify-center">
-            {isListening && (
-              <WaveAnimation isActive={!!interimTranscript} />
-            )}
-            
-            {displayText ? (
-              <p className="mt-3 text-center text-lg font-medium animate-fade-in">
-                "{displayText}"
-              </p>
-            ) : isListening ? (
-              <p className="mt-3 text-center text-sm text-muted-foreground">
-                Speak now...
-              </p>
-            ) : isProcessing || ttsLoading ? (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                <span>Processing...</span>
-              </div>
-            ) : isSpeaking ? (
-              <div className="flex items-center gap-2 text-primary">
-                <Volume2 className="h-5 w-5 animate-pulse" />
-                <span>Delton is speaking...</span>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Ready</p>
-            )}
-          </div>
+    <div className="flex flex-col items-center gap-8 w-full max-w-md">
+      <AnimatePresence mode="wait">
+        {isActive ? (
+          <motion.div
+            key="active"
+            className="flex flex-col items-center gap-6 w-full"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            {/* Voice Orb */}
+            <VoiceOrb
+              isListening={isListening}
+              isSpeaking={isSpeaking}
+              isProcessing={isProcessing || ttsLoading}
+              size={180}
+            />
 
-          <div className="flex items-center gap-2 text-sm">
-            {isListening ? (
-              <span className="flex items-center gap-2 text-emerald-500">
-                <Mic className="h-4 w-4" />
-                Listening
-              </span>
-            ) : isProcessing || ttsLoading ? (
-              <span className="flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Thinking...
-              </span>
-            ) : isSpeaking ? (
-              <span className="flex items-center gap-2 text-primary">
-                <Volume2 className="h-4 w-4 animate-pulse" />
-                Speaking (ElevenLabs)
-              </span>
-            ) : null}
-          </div>
-
-          <div className={cn(
-            "relative flex h-24 w-24 items-center justify-center rounded-full transition-all duration-300",
-            isListening && "bg-emerald-500/20",
-            isSpeaking && "bg-primary/20",
-            (isProcessing || ttsLoading) && "bg-muted"
-          )}>
-            <div className={cn(
-              "absolute inset-0 rounded-full transition-all duration-300",
-              isListening && "animate-ping bg-emerald-500/30",
-              isSpeaking && "animate-pulse bg-primary/30"
-            )} />
-            <div className={cn(
-              "relative flex h-16 w-16 items-center justify-center rounded-full",
-              isListening && "bg-emerald-500",
-              isSpeaking && "bg-primary",
-              (isProcessing || ttsLoading) && "bg-muted-foreground",
-              !isListening && !isSpeaking && !isProcessing && !ttsLoading && "bg-muted-foreground/50"
-            )}>
-              {isProcessing || ttsLoading ? (
-                <Loader2 className="h-8 w-8 animate-spin text-background" />
-              ) : isSpeaking ? (
-                <Volume2 className="h-8 w-8 text-background" />
-              ) : (
-                <Mic className="h-8 w-8 text-background" />
+            {/* Status label */}
+            <motion.div
+              className="flex items-center gap-2"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              key={statusLabel}
+            >
+              {isListening && (
+                <motion.span
+                  className="h-2 w-2 rounded-full bg-primary"
+                  animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                />
               )}
+              {(isProcessing || ttsLoading) && (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              )}
+              {isSpeaking && (
+                <Volume2 className="h-4 w-4 text-primary animate-pulse" />
+              )}
+              <span className={cn(
+                'text-sm font-medium',
+                isListening ? 'text-primary' : 'text-muted-foreground'
+              )}>
+                {statusLabel}
+              </span>
+            </motion.div>
+
+            {/* Live transcript */}
+            <AnimatePresence>
+              {displayText && (
+                <motion.div
+                  className="w-full rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm p-4 text-center"
+                  initial={{ opacity: 0, y: 10, height: 0 }}
+                  animate={{ opacity: 1, y: 0, height: 'auto' }}
+                  exit={{ opacity: 0, y: 10, height: 0 }}
+                >
+                  <p className="text-base font-medium text-foreground">
+                    "{displayText}"
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* End button */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <Button
+                size="lg"
+                variant="destructive"
+                onClick={endConversation}
+                className="rounded-full px-8 gap-2"
+              >
+                <PhoneOff className="h-4 w-4" />
+                End
+              </Button>
+            </motion.div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="inactive"
+            className="flex flex-col items-center gap-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            {/* Idle orb - tappable to start */}
+            <motion.button
+              onClick={startConversation}
+              className="relative focus:outline-none"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <VoiceOrb
+                isListening={false}
+                isSpeaking={false}
+                isProcessing={false}
+                size={160}
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Mic className="h-8 w-8 text-muted-foreground/70" />
+              </div>
+            </motion.button>
+
+            <div className="text-center space-y-1">
+              <h3 className="text-lg font-semibold text-foreground">Voice Mode</h3>
+              <p className="text-sm text-muted-foreground max-w-xs">
+                Tap the orb to start a voice conversation with Delton
+              </p>
             </div>
-          </div>
-
-          <Button
-            size="lg"
-            variant="destructive"
-            onClick={endConversation}
-            className="rounded-full px-8"
-          >
-            <PhoneOff className="h-5 w-5 mr-2" />
-            End Conversation
-          </Button>
-        </>
-      ) : (
-        <>
-          <div className="text-center space-y-2">
-            <h3 className="text-lg font-semibold">Voice Mode</h3>
-            <p className="text-sm text-muted-foreground">
-              Have a conversation with Delton using your voice (powered by ElevenLabs)
-            </p>
-          </div>
-
-          <Button
-            size="lg"
-            onClick={startConversation}
-            className="rounded-full px-8 bg-emerald-500 hover:bg-emerald-600"
-          >
-            <Phone className="h-5 w-5 mr-2" />
-            Start Conversation
-          </Button>
-        </>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
