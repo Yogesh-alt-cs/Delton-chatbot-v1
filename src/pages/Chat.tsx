@@ -15,9 +15,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
-// Lazy load heavy components not needed on initial render
 const VoiceConversation = lazy(() => import('@/components/chat/VoiceConversation').then(m => ({ default: m.VoiceConversation })));
-const DocumentUpload = lazy(() => import('@/components/chat/DocumentUpload').then(m => ({ default: m.DocumentUpload })));
 
 export default function Chat() {
   const navigate = useNavigate();
@@ -29,7 +27,6 @@ export default function Chat() {
   const [mode, setMode] = useState<'text' | 'voice'>('text');
   const [isMicActive, setIsMicActive] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [documentContext, setDocumentContext] = useState<string>('');
 
   const { exportSingleConversation } = useExportData();
   const { remainingChats, isLimitReached, incrementUsage, DAILY_LIMIT } = useDailyLimit();
@@ -46,39 +43,16 @@ export default function Chat() {
 
   const handleSendMessage = useCallback(async (content: string, images?: import('@/lib/types').MessageImage[]) => {
     if (isLimitReached) {
-      toast({
-        title: "Daily limit reached",
-        description: `You've used all ${DAILY_LIMIT} chats for today. Your limit resets at midnight.`,
-        variant: "destructive"
-      });
+      toast({ title: "Daily limit reached", description: `You've used all ${DAILY_LIMIT} chats for today.`, variant: "destructive" });
       return;
     }
-
     const canProceed = await incrementUsage();
     if (!canProceed) {
-      toast({
-        title: "Daily limit reached",
-        description: `You've used all ${DAILY_LIMIT} chats for today. Your limit resets at midnight.`,
-        variant: "destructive"
-      });
+      toast({ title: "Daily limit reached", description: `You've used all ${DAILY_LIMIT} chats for today.`, variant: "destructive" });
       return;
     }
-
-    let enrichedContent = content;
-    if (documentContext) {
-      enrichedContent = content + `\n\n[Document Content]\n${documentContext.slice(0, 8000)}\n[End Document]`;
-    }
-
-    await sendMessage(enrichedContent, images);
-  }, [isLimitReached, incrementUsage, sendMessage, toast, DAILY_LIMIT, documentContext]);
-
-  const handleDocumentProcessed = useCallback((content: string, fileName: string) => {
-    setDocumentContext(content);
-    toast({
-      title: "Document Ready",
-      description: `${fileName} is ready. Ask questions about it!`
-    });
-  }, [toast]);
+    await sendMessage(content, images);
+  }, [isLimitReached, incrementUsage, sendMessage, toast, DAILY_LIMIT]);
 
   useEffect(() => {
     if (urlConversationId && urlConversationId !== conversationId) {
@@ -87,12 +61,8 @@ export default function Chat() {
   }, [urlConversationId, conversationId, loadConversation]);
 
   useEffect(() => {
-    const assistantMessageIds = messages
-      .filter((m) => m.role === 'assistant')
-      .map((m) => m.id);
-    if (assistantMessageIds.length > 0) {
-      loadFeedback(assistantMessageIds);
-    }
+    const assistantMessageIds = messages.filter((m) => m.role === 'assistant').map((m) => m.id);
+    if (assistantMessageIds.length > 0) loadFeedback(assistantMessageIds);
   }, [messages, loadFeedback]);
 
   useEffect(() => {
@@ -103,13 +73,10 @@ export default function Chat() {
     const container = scrollContainerRef.current;
     if (!container) return;
     const { scrollTop, scrollHeight, clientHeight } = container;
-    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
-    setShowScrollButton(!isNearBottom && messages.length > 0);
+    setShowScrollButton(scrollHeight - scrollTop - clientHeight > 100 && messages.length > 0);
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 
   const handleNewChat = () => {
     clearChat();
@@ -120,35 +87,30 @@ export default function Chat() {
     toggleFeedback(messageId, type);
   }, [toggleFeedback]);
 
-  const isLastMessageStreaming = isLoading && messages.length > 0 &&
-    messages[messages.length - 1]?.role === 'assistant';
+  const isLastMessageStreaming = isLoading && messages.length > 0 && messages[messages.length - 1]?.role === 'assistant';
 
   return (
     <div className="flex h-screen bg-background">
       <MicIndicator isActive={isMicActive} />
 
-      <ChatSidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        onNewChat={handleNewChat}
-      />
+      <ChatSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} onNewChat={handleNewChat} />
 
       <div className="flex flex-1 flex-col min-w-0">
-        {/* Header */}
-        <header className="flex h-14 items-center justify-between border-b border-border px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 safe-top shrink-0">
+        {/* Header - Liquid Glass */}
+        <header className="flex h-14 items-center justify-between px-4 glass-panel-strong safe-top shrink-0 z-10 border-b border-border/30">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" className="h-10 w-10 lg:hidden" onClick={() => setSidebarOpen(true)}>
               <Menu className="h-5 w-5" />
             </Button>
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10">
                 <MessageCircle className="h-4 w-4 text-primary" />
               </div>
               <span className="font-semibold text-sm hidden sm:inline">Delton AI</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-1 rounded-full bg-muted/50 p-1">
+          <div className="flex items-center gap-1 rounded-full glass-input p-1">
             <Button variant={mode === 'text' ? 'secondary' : 'ghost'} size="sm" onClick={() => setMode('text')} className="h-8 gap-1.5 px-3 rounded-full text-xs">
               <MessageCircle className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Text</span>
@@ -190,17 +152,12 @@ export default function Chat() {
             <div ref={scrollContainerRef} className="relative flex-1 overflow-y-auto" onScroll={handleScroll}>
               {messages.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-                  <h2 className="mb-2 text-2xl font-semibold">How can I help you today?</h2>
-                  <p className="max-w-md text-sm text-muted-foreground mb-6">
-                    I can answer questions, help with analysis, write content, and much more. Upload documents or just start typing.
-                  </p>
-                  <Suspense fallback={<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}>
-                    <DocumentUpload
-                      conversationId={conversationId}
-                      onDocumentProcessed={handleDocumentProcessed}
-                      disabled={isLoading}
-                    />
-                  </Suspense>
+                  <div className="glass-panel rounded-3xl p-8 max-w-md">
+                    <h2 className="mb-2 text-2xl font-semibold">What can I help with?</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Ask me anything — questions, analysis, creative writing, and more.
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <div className="mx-auto max-w-3xl py-4">
@@ -227,7 +184,7 @@ export default function Chat() {
                   size="icon"
                   variant="secondary"
                   className={cn(
-                    "absolute bottom-4 left-1/2 -translate-x-1/2 h-9 w-9 rounded-full shadow-lg border border-border",
+                    "absolute bottom-4 left-1/2 -translate-x-1/2 h-9 w-9 rounded-full shadow-lg glass-panel",
                     "transition-all hover:scale-105"
                   )}
                   onClick={scrollToBottom}
@@ -237,8 +194,8 @@ export default function Chat() {
               )}
             </div>
 
-            <div className="shrink-0 border-t border-border bg-background safe-bottom">
-              <div className="mx-auto max-w-3xl">
+            <div className="shrink-0 bg-transparent safe-bottom">
+              <div className="mx-auto max-w-3xl px-3 pb-3 sm:px-4 sm:pb-4">
                 <ChatInput onSend={handleSendMessage} disabled={isLoading || isLimitReached} onMicStateChange={setIsMicActive} />
               </div>
             </div>

@@ -1,5 +1,4 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap");
 
@@ -9,44 +8,46 @@
 
 @layer base {
   :root {
-    /* Delton Chatbot Design System */
-    --background: 209 40% 96%;
+    --background: 220 20% 97%;
     --foreground: 222 47% 11%;
 
-    --card: 210 40% 98%;
+    --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
 
-    --popover: 214 31% 91%;
+    --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    /* Primary - Blue 600 */
     --primary: 200 98% 39%;
     --primary-foreground: 204 100% 97%;
 
-    /* Secondary - Slate 50 */
     --secondary: 215 24% 26%;
     --secondary-foreground: 210 40% 98%;
 
     --muted: 215 20% 65%;
     --muted-foreground: 222 47% 11%;
 
-    /* Accent - Emerald 500 */
     --accent: 210 40% 98%;
     --accent-foreground: 215 19% 34%;
 
     --destructive: 0 72% 50%;
     --destructive-foreground: 0 85% 97%;
 
-    --border: 212 26% 83%;
-    --input: 212 26% 83%;
+    --border: 212 26% 88%;
+    --input: 212 26% 88%;
     --ring: 200 98% 39%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    /* Chat-specific tokens */
+    /* Glass tokens */
+    --glass-bg: 0 0% 100% / 0.6;
+    --glass-border: 0 0% 100% / 0.18;
+    --glass-glow: 200 98% 60% / 0.08;
+    --glass-blur: 24px;
+
+    /* Chat tokens */
     --chat-user-bubble: 217 91% 60%;
     --chat-user-text: 0 0% 100%;
-    --chat-ai-bubble: 210 40% 96%;
+    --chat-ai-bubble: 0 0% 100% / 0.7;
     --chat-ai-text: 222 47% 11%;
 
     /* Sidebar */
@@ -56,14 +57,14 @@
     --sidebar-primary-foreground: 204 100% 97%;
     --sidebar-accent: 215 24% 26%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 212 26% 83%;
+    --sidebar-border: 212 26% 88%;
     --sidebar-ring: 200 98% 39%;
+    --sidebar: 0 0% 100%;
     --chart-1: 198 93% 59%;
     --chart-2: 213 93% 67%;
     --chart-3: 215 20% 65%;
     --chart-4: 215 16% 46%;
     --chart-5: 215 19% 34%;
-    --sidebar: 210 40% 98%;
     --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
     --font-serif: 'Lora', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
     --font-mono: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
@@ -80,63 +81,69 @@
   }
 
   .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
+    --background: 225 15% 6%;
+    --foreground: 210 40% 96%;
 
-    --card: 217 32% 17%;
-    --card-foreground: 210 40% 98%;
+    --card: 225 15% 10%;
+    --card-foreground: 210 40% 96%;
 
-    --popover: 215 24% 26%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 225 15% 10%;
+    --popover-foreground: 210 40% 96%;
 
     --primary: 198 93% 59%;
-    --primary-foreground: 204 80% 15%;
+    --primary-foreground: 204 80% 8%;
 
     --secondary: 212 26% 83%;
     --secondary-foreground: 228 84% 4%;
 
     --muted: 215 16% 46%;
-    --muted-foreground: 210 40% 98%;
+    --muted-foreground: 210 40% 80%;
 
-    --accent: 228 84% 4%;
+    --accent: 225 15% 14%;
     --accent-foreground: 215 20% 65%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 85% 97%;
 
-    --border: 215 19% 34%;
-    --input: 215 19% 34%;
+    --border: 225 12% 16%;
+    --input: 225 12% 16%;
     --ring: 198 93% 59%;
 
-    /* Chat-specific tokens */
+    /* Glass tokens - dark */
+    --glass-bg: 0 0% 100% / 0.06;
+    --glass-border: 0 0% 100% / 0.08;
+    --glass-glow: 198 93% 59% / 0.06;
+    --glass-blur: 24px;
+
+    /* Chat tokens */
     --chat-user-bubble: 217 91% 55%;
     --chat-user-text: 0 0% 100%;
-    --chat-ai-bubble: 217 33% 17%;
-    --chat-ai-text: 210 40% 98%;
+    --chat-ai-bubble: 0 0% 100% / 0.06;
+    --chat-ai-text: 210 40% 96%;
 
     /* Sidebar */
-    --sidebar-background: 222 47% 6%;
-    --sidebar-foreground: 210 40% 98%;
+    --sidebar-background: 225 15% 8%;
+    --sidebar-foreground: 210 40% 96%;
     --sidebar-primary: 198 93% 59%;
-    --sidebar-primary-foreground: 204 80% 15%;
+    --sidebar-primary-foreground: 204 80% 8%;
     --sidebar-accent: 215 20% 65%;
     --sidebar-accent-foreground: 228 84% 4%;
-    --sidebar-border: 215 19% 34%;
+    --sidebar-border: 225 12% 16%;
     --sidebar-ring: 198 93% 59%;
+    --sidebar: 225 15% 10%;
     --chart-1: 199 95% 73%;
     --chart-2: 211 96% 78%;
     --chart-3: 215 20% 65%;
     --chart-4: 215 16% 46%;
     --chart-5: 215 19% 34%;
-    --sidebar: 217 32% 17%;
-    --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-    --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-    --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-    --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
-    --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
-    --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
-    --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+    --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.1);
+    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.1);
+    --shadow-sm: 0 2px 4px 0px hsl(0 0% 0% / 0.2), 0 1px 2px -1px hsl(0 0% 0% / 0.2);
+    --shadow: 0 2px 4px 0px hsl(0 0% 0% / 0.2), 0 1px 2px -1px hsl(0 0% 0% / 0.2);
+    --shadow-md: 0 2px 6px 0px hsl(0 0% 0% / 0.25), 0 2px 4px -1px hsl(0 0% 0% / 0.2);
+    --shadow-lg: 0 4px 12px 0px hsl(0 0% 0% / 0.3), 0 4px 6px -1px hsl(0 0% 0% / 0.2);
+    --shadow-xl: 0 8px 24px 0px hsl(0 0% 0% / 0.35), 0 8px 10px -1px hsl(0 0% 0% / 0.2);
+    --shadow-2xl: 0 12px 48px 0px hsl(0 0% 0% / 0.5);
   }
 }
 
@@ -178,6 +185,43 @@
     scrollbar-width: none;
   }
 
+  /* --- Liquid Glass System --- */
+  .glass-panel {
+    background: hsl(var(--glass-bg));
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid hsl(var(--glass-border));
+    box-shadow: 
+      0 4px 24px -4px hsl(0 0% 0% / 0.08),
+      inset 0 1px 0 0 hsl(0 0% 100% / 0.06);
+  }
+
+  .glass-panel-strong {
+    background: hsl(var(--glass-bg));
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border: 1px solid hsl(var(--glass-border));
+    box-shadow: 
+      0 8px 32px -8px hsl(0 0% 0% / 0.12),
+      inset 0 1px 0 0 hsl(0 0% 100% / 0.08);
+  }
+
+  .glass-input {
+    background: hsl(var(--glass-bg));
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid hsl(var(--glass-border));
+    box-shadow: 
+      0 2px 12px -2px hsl(0 0% 0% / 0.06),
+      inset 0 1px 0 0 hsl(0 0% 100% / 0.04);
+  }
+
+  .glass-glow {
+    box-shadow: 
+      0 0 20px 4px hsl(var(--glass-glow)),
+      0 4px 24px -4px hsl(0 0% 0% / 0.08);
+  }
+
   /* Voice orb glow */
   .voice-orb-glow {
     box-shadow: 0 0 40px 10px hsl(var(--primary) / 0.3),
@@ -189,13 +233,5 @@
     box-shadow: 0 0 50px 15px hsl(var(--primary) / 0.45),
                 0 0 100px 30px hsl(var(--primary) / 0.25),
                 0 0 150px 50px hsl(var(--primary) / 0.1);
-  }
-
-  /* Glassmorphism */
-  .glass-panel {
-    background: hsl(var(--card) / 0.8);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid hsl(var(--border) / 0.5);
   }
 }
