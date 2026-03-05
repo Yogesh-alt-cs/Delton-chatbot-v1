@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, KeyboardEvent } from 'react';
-import { Send, Plus, X, Mic, MicOff, Camera, RotateCcw, Check, Loader2 } from 'lucide-react';
+import { Send, Plus, X, Mic, MicOff, RotateCcw, Check, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,7 +16,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-// Inline Camera Dialog
 function CameraDialog({ isOpen, onClose, onCapture }: {
   isOpen: boolean;
   onClose: () => void;
@@ -71,9 +70,9 @@ function CameraDialog({ isOpen, onClose, onCapture }: {
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="sm:max-w-md p-0 overflow-hidden bg-background border-border">
+      <DialogContent className="sm:max-w-md p-0 overflow-hidden glass-panel-strong rounded-3xl border-border/30">
         <DialogHeader className="p-4 pb-2"><DialogTitle>Take a Photo</DialogTitle></DialogHeader>
-        <div className="relative aspect-[4/3] bg-muted">
+        <div className="relative aspect-[4/3] bg-muted rounded-xl overflow-hidden mx-4">
           {loading && <div className="absolute inset-0 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}
           {captured ? <img src={captured} alt="Captured" className="w-full h-full object-cover" /> : <video ref={videoRef} autoPlay playsInline muted className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`} />}
           <canvas ref={canvasRef} className="hidden" />
@@ -111,22 +110,16 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
   const [images, setImages] = useState<MessageImage[]>([]);
   const [attachmentOpen, setAttachmentOpen] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
-  const docInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
 
   useEffect(() => {
     const loadLanguage = async () => {
       if (!user) return;
-      const { data } = await supabase
-        .from('user_settings')
-        .select('voice_language')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (data?.voice_language) {
-        setLanguage(data.voice_language);
-      }
+      const { data } = await supabase.from('user_settings').select('voice_language').eq('user_id', user.id).maybeSingle();
+      if (data?.voice_language) setLanguage(data.voice_language);
     };
     loadLanguage();
   }, [user]);
@@ -136,15 +129,11 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
       setMessage((prev) => (prev + ' ' + transcript).trim());
       setInterimText('');
     },
-    onInterimResult: (transcript) => {
-      setInterimText(transcript);
-    },
+    onInterimResult: (transcript) => setInterimText(transcript),
     language,
   });
 
-  useEffect(() => {
-    onMicStateChange?.(isListening);
-  }, [isListening, onMicStateChange]);
+  useEffect(() => { onMicStateChange?.(isListening); }, [isListening, onMicStateChange]);
 
   const handleSend = () => {
     const trimmed = message.trim();
@@ -153,16 +142,11 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
     setMessage('');
     setInterimText('');
     setImages([]);
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
   const handleInput = () => {
@@ -196,12 +180,12 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
   const hasContent = message.trim() || images.length > 0;
 
   return (
-    <div className="p-3 sm:p-4">
+    <div>
       {/* Image previews */}
       <AnimatePresence>
         {images.length > 0 && (
           <motion.div
-            className="flex gap-2 flex-wrap mb-3"
+            className="flex gap-2 flex-wrap mb-3 px-2"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
@@ -209,17 +193,13 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
             {images.map((image, index) => (
               <motion.div
                 key={index}
-                className="relative w-14 h-14 rounded-xl overflow-hidden border border-border/50"
+                className="relative w-14 h-14 rounded-2xl overflow-hidden glass-panel"
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0, opacity: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
-                <img
-                  src={image.url}
-                  alt={`Upload ${index + 1}`}
-                  className="w-full h-full object-cover"
-                />
+                <img src={image.url} alt={`Upload ${index + 1}`} className="w-full h-full object-cover" />
                 <motion.button
                   onClick={() => setImages(images.filter((_, i) => i !== index))}
                   className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-background/90 hover:bg-background text-foreground"
@@ -234,20 +214,27 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
         )}
       </AnimatePresence>
 
-      {/* Unified input bar */}
-      <div className="relative flex items-end gap-1.5 rounded-2xl border border-border/60 bg-card/80 backdrop-blur-sm p-1.5 shadow-sm focus-within:border-primary/40 focus-within:ring-1 focus-within:ring-primary/15 transition-all">
+      {/* Liquid Glass Input Bar */}
+      <motion.div
+        className={cn(
+          "relative flex items-end gap-1.5 rounded-[28px] p-1.5 transition-all duration-300",
+          "glass-panel-strong",
+          isFocused && "glass-glow"
+        )}
+        layout
+      >
         {/* Attachment button */}
         <div className="relative shrink-0">
           <motion.button
             type="button"
             className={cn(
-              'flex items-center justify-center h-9 w-9 rounded-xl transition-colors',
-              'text-muted-foreground hover:text-foreground hover:bg-muted/50',
-              attachmentOpen && 'bg-muted/50 text-foreground'
+              'flex items-center justify-center h-9 w-9 rounded-full transition-colors',
+              'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+              attachmentOpen && 'bg-accent/50 text-foreground'
             )}
             onClick={() => setAttachmentOpen(!attachmentOpen)}
             disabled={disabled}
-            whileTap={{ scale: 0.92 }}
+            whileTap={{ scale: 0.9 }}
             animate={{ rotate: attachmentOpen ? 45 : 0 }}
             transition={{ duration: 0.2 }}
           >
@@ -259,12 +246,10 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
             onClose={() => setAttachmentOpen(false)}
             onCameraOpen={() => setShowCamera(true)}
             onPhotoSelect={() => photoInputRef.current?.click()}
-            onDocumentSelect={() => docInputRef.current?.click()}
             disabled={disabled}
           />
         </div>
 
-        {/* Hidden file inputs */}
         <input
           ref={photoInputRef}
           type="file"
@@ -273,31 +258,19 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
           onChange={handlePhotoFiles}
           className="hidden"
         />
-        <input
-          ref={docInputRef}
-          type="file"
-          accept=".pdf,.txt,.csv,.md,.docx"
-          multiple
-          onChange={(e) => {
-            // Document upload handled by parent
-            if (docInputRef.current) docInputRef.current.value = '';
-          }}
-          className="hidden"
-        />
 
         {/* Text input */}
         <Textarea
           ref={textareaRef}
           value={displayText}
-          onChange={(e) => {
-            setMessage(e.target.value);
-            setInterimText('');
-          }}
+          onChange={(e) => { setMessage(e.target.value); setInterimText(''); }}
           onKeyDown={handleKeyDown}
           onInput={handleInput}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
           placeholder={isListening ? 'Listening...' : 'Message Delton...'}
           className={cn(
-            'min-h-[40px] max-h-40 resize-none border-0 bg-transparent p-2 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/50',
+            'min-h-[40px] max-h-40 resize-none border-0 bg-transparent p-2 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/40',
             isListening && 'text-primary'
           )}
           rows={1}
@@ -306,71 +279,57 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
 
         {/* Right side: mic + send */}
         <div className="flex items-center gap-1 shrink-0">
-          {/* Mic button */}
           {isSupported && (
             <motion.button
               type="button"
               className={cn(
-                'flex items-center justify-center h-9 w-9 rounded-xl transition-all',
+                'relative flex items-center justify-center h-9 w-9 rounded-full transition-all',
                 isListening
                   ? 'text-primary bg-primary/10'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
               )}
               onClick={toggleListening}
               disabled={disabled}
-              whileTap={{ scale: 0.92 }}
+              whileTap={{ scale: 0.9 }}
             >
               <AnimatePresence mode="wait">
                 {isListening ? (
-                  <motion.div
-                    key="mic-off"
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    exit={{ scale: 0 }}
-                  >
+                  <motion.div key="off" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
                     <MicOff className="h-4 w-4" />
                   </motion.div>
                 ) : (
-                  <motion.div
-                    key="mic-on"
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    exit={{ scale: 0 }}
-                  >
+                  <motion.div key="on" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
                     <Mic className="h-4 w-4" />
                   </motion.div>
                 )}
               </AnimatePresence>
-
-              {/* Listening pulse ring */}
               {isListening && (
                 <motion.span
-                  className="absolute inset-0 rounded-xl border-2 border-primary/40"
-                  animate={{ scale: [1, 1.2, 1], opacity: [0.6, 0, 0.6] }}
+                  className="absolute inset-0 rounded-full border-2 border-primary/40"
+                  animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0, 0.6] }}
                   transition={{ duration: 1.5, repeat: Infinity }}
                 />
               )}
             </motion.button>
           )}
 
-          {/* Send button */}
           <motion.button
             type="button"
             className={cn(
-              'flex items-center justify-center h-9 w-9 rounded-xl transition-all',
+              'flex items-center justify-center h-9 w-9 rounded-full transition-all',
               hasContent && !disabled
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted/50 text-muted-foreground'
+                ? 'bg-primary text-primary-foreground shadow-md'
+                : 'bg-accent/50 text-muted-foreground'
             )}
             disabled={!hasContent || disabled}
             onClick={handleSend}
-            whileHover={hasContent && !disabled ? { scale: 1.05 } : {}}
-            whileTap={hasContent && !disabled ? { scale: 0.92 } : {}}
+            whileHover={hasContent && !disabled ? { scale: 1.08 } : {}}
+            whileTap={hasContent && !disabled ? { scale: 0.9 } : {}}
           >
             <Send className="h-4 w-4" />
           </motion.button>
         </div>
-      </div>
+      </motion.div>
 
       {/* Listening indicator */}
       <AnimatePresence>
@@ -387,18 +346,14 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
         )}
       </AnimatePresence>
 
-      <p className="text-center text-[10px] text-muted-foreground/40 mt-2">
+      <p className="text-center text-[10px] text-muted-foreground/30 mt-2">
         Delton can make mistakes. Consider checking important information.
       </p>
 
-      {/* Camera Dialog */}
       <CameraDialog
         isOpen={showCamera}
         onClose={() => setShowCamera(false)}
-        onCapture={(image) => {
-          setImages((prev) => [...prev, image]);
-          setShowCamera(false);
-        }}
+        onCapture={(image) => { setImages((prev) => [...prev, image]); setShowCamera(false); }}
       />
     </div>
   );

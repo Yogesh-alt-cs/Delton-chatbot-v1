@@ -291,7 +291,7 @@ export function VoiceConversation({
 
   if (!isSupported) {
     return (
-      <div className="w-full max-w-md rounded-2xl border border-border bg-card/50 p-6 text-center">
+      <div className="w-full max-w-md glass-panel rounded-3xl p-6 text-center">
         <p className="text-sm text-muted-foreground">
           Voice mode isn't supported in this browser. Please try Chrome.
         </p>
@@ -359,7 +359,7 @@ export function VoiceConversation({
             <AnimatePresence>
               {displayText && (
                 <motion.div
-                  className="w-full rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm p-4 text-center"
+                  className="w-full glass-panel rounded-2xl p-4 text-center"
                   initial={{ opacity: 0, y: 10, height: 0 }}
                   animate={{ opacity: 1, y: 0, height: 'auto' }}
                   exit={{ opacity: 0, y: 10, height: 0 }}
