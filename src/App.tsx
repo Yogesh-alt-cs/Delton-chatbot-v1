@@ -49,10 +49,24 @@ function AppRoutes() {
                 <Route path="/profile" element={<AuthGuard><Profile /></AuthGuard>} />
                 <Route path="/profile/edit" element={<AuthGuard><ProfileEdit /></AuthGuard>} />
 
-                {/* 404 */}
+              {/* 404 */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
+      )}
+    </>
+  );
+}
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <ThemeProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AppRoutes />
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>
