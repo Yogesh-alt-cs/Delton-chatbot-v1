@@ -4,10 +4,11 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthGuard } from "@/components/auth/AuthGuard";
-import { Loader2 } from "lucide-react";
+import { SplashScreen } from "@/components/SplashScreen";
+import { AnimatePresence } from "framer-motion";
 
 import Welcome from "@/pages/Welcome";
 import Auth from "@/pages/Auth";
@@ -21,24 +22,19 @@ const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 import NotFound from "@/pages/NotFound";
 
-const LazyFallback = () => (
-  <div className="flex min-h-screen items-center justify-center bg-background">
-    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-  </div>
-);
+const LazyFallback = () => null;
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Suspense fallback={<LazyFallback />}>
-              <Routes>
+function AppRoutes() {
+  const { loading } = useAuth();
+
+  return (
+    <>
+      <AnimatePresence>{loading && <SplashScreen />}</AnimatePresence>
+      {!loading && (
+        <Suspense fallback={<LazyFallback />}>
+          <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<Welcome />} />
                 <Route path="/auth" element={<Auth />} />
