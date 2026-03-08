@@ -86,6 +86,7 @@
   }
 
   /* ===== DARK THEME ===== */
+  html[data-theme="dark"],
   [data-theme="dark"] {
     --background: 232 30% 5%;
     --foreground: 210 40% 94%;
