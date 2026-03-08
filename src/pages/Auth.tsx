@@ -89,8 +89,8 @@ export default function Auth() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Left panel — branded gradient */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden items-center justify-center auth-gradient-bg">
+      {/* Left panel — branded gradient (hidden on mobile, 40% on tablet, 50% on desktop) */}
+      <div className="hidden md:flex md:w-[40%] lg:w-1/2 relative overflow-hidden items-center justify-center auth-gradient-bg">
         {/* Floating particles */}
         <div className="absolute inset-0 overflow-hidden">
           {[...Array(6)].map((_, i) => (
@@ -114,11 +114,11 @@ export default function Auth() {
           ))}
         </div>
 
-        <div className="relative z-10 text-center px-12 max-w-lg">
+        <div className="relative z-10 text-center px-8 lg:px-12 max-w-lg">
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.7 }}
             className="mb-8 mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-primary shadow-xl shadow-primary/30"
           >
             <MessageSquare className="h-10 w-10 text-primary-foreground" />
@@ -127,7 +127,7 @@ export default function Auth() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.6 }}
-            className="text-4xl font-bold text-foreground mb-3"
+            className="text-3xl lg:text-4xl font-bold text-foreground mb-3"
           >
             Delton AI
           </motion.h1>
@@ -135,7 +135,7 @@ export default function Auth() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.45, duration: 0.6 }}
-            className="text-lg text-muted-foreground"
+            className="text-base lg:text-lg text-muted-foreground"
           >
             Your intelligent AI assistant — answers, analysis, and creative help, instantly.
           </motion.p>
@@ -143,22 +143,23 @@ export default function Auth() {
       </div>
 
       {/* Right panel — form */}
-      <div className="flex flex-1 flex-col items-center justify-center px-6 py-12">
+      <div className="flex flex-1 flex-col items-center justify-center px-4 sm:px-6 py-12">
         <motion.div
           className="w-full max-w-sm"
           variants={stagger}
           initial="hidden"
           animate="show"
         >
-          {/* Mobile logo */}
-          <motion.div variants={fadeUp} className="mb-8 flex flex-col items-center lg:hidden">
+          {/* Mobile/tablet logo (hidden when left panel is visible on md+) */}
+          <motion.div variants={fadeUp} className="mb-8 flex flex-col items-center md:hidden">
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/25">
               <MessageSquare className="h-8 w-8 text-primary-foreground" />
             </div>
+            <h2 className="text-xl font-bold text-foreground">Delton AI</h2>
           </motion.div>
 
           <motion.div variants={fadeUp}>
-            <h1 className="text-2xl font-bold text-foreground">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">
               {isLogin ? 'Welcome back' : 'Create account'}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -213,7 +214,7 @@ export default function Auth() {
             <motion.div variants={fadeUp}>
               <Button
                 type="submit"
-                className="h-11 w-full text-base font-semibold auth-btn-shimmer"
+                className="h-12 w-full text-base font-semibold auth-btn-shimmer"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -231,7 +232,7 @@ export default function Auth() {
             <button
               type="button"
               onClick={() => setIsLogin(!isLogin)}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] px-2"
               disabled={isLoading}
             >
               {isLogin ? (
@@ -242,11 +243,11 @@ export default function Auth() {
             </button>
           </motion.div>
 
-          <motion.div variants={fadeUp} className="mt-8 text-center">
+          <motion.div variants={fadeUp} className="mt-6 text-center">
             <button
               type="button"
               onClick={() => navigate('/')}
-              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] px-2"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               Back to home

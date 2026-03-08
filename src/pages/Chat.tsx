@@ -11,7 +11,6 @@ import { useChat } from '@/hooks/useChat';
 import { useExportData } from '@/hooks/useExportData';
 import { useFeedback } from '@/hooks/useFeedback';
 import { useDailyLimit } from '@/hooks/useDailyLimit';
-import { useDocumentRAG } from '@/hooks/useDocumentRAG';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -42,12 +41,9 @@ export default function Chat() {
 
   const { feedbackMap, loadFeedback, toggleFeedback } = useFeedback();
 
-  const { uploadDocument, formatForContext, isProcessing: isDocProcessing } = useDocumentRAG();
-
   const handleSendMessage = useCallback(async (
     content: string,
-    images?: import('@/lib/types').MessageImage[],
-    document?: { file: File; name: string; type: string }
+    images?: import('@/lib/types').MessageImage[]
   ) => {
     if (isLimitReached) {
       toast({ title: "Daily limit reached", description: `You've used all ${DAILY_LIMIT} chats for today.`, variant: "destructive" });
@@ -58,18 +54,8 @@ export default function Chat() {
       toast({ title: "Daily limit reached", description: `You've used all ${DAILY_LIMIT} chats for today.`, variant: "destructive" });
       return;
     }
-
-    let enrichedContent = content;
-    if (document) {
-      toast({ title: '📄 Analyzing document...', description: document.name });
-      const parsed = await uploadDocument(document.file, conversationId);
-      if (parsed) {
-        enrichedContent = content + formatForContext(parsed);
-      }
-    }
-
-    await sendMessage(enrichedContent, images);
-  }, [isLimitReached, incrementUsage, sendMessage, toast, DAILY_LIMIT, uploadDocument, formatForContext, conversationId]);
+    await sendMessage(content, images);
+  }, [isLimitReached, incrementUsage, sendMessage, toast, DAILY_LIMIT]);
 
   useEffect(() => {
     if (urlConversationId && urlConversationId !== conversationId) {
@@ -107,14 +93,14 @@ export default function Chat() {
   const isLastMessageStreaming = isLoading && messages.length > 0 && messages[messages.length - 1]?.role === 'assistant';
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-[100dvh] bg-background">
       <MicIndicator isActive={isMicActive} />
 
       <ChatSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} onNewChat={handleNewChat} />
 
       <div className="flex flex-1 flex-col min-w-0">
-        {/* Header - Liquid Glass */}
-        <header className="flex h-14 items-center justify-between px-4 glass-panel-strong safe-top shrink-0 z-10 border-b border-border/30">
+        {/* Header */}
+        <header className="flex h-14 items-center justify-between px-3 sm:px-4 glass-panel-strong safe-top shrink-0 z-10 border-b border-border/30">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" className="h-10 w-10 lg:hidden" onClick={() => setSidebarOpen(true)}>
               <Menu className="h-5 w-5" />
@@ -154,7 +140,7 @@ export default function Chat() {
         </header>
 
         {mode === 'voice' ? (
-          <div className="flex flex-1 flex-col items-center justify-center p-8">
+          <div className="flex flex-1 flex-col items-center justify-center p-4 sm:p-8">
             <Suspense fallback={<Loader2 className="h-8 w-8 animate-spin text-primary" />}>
               <VoiceConversation
                 conversationId={conversationId}
@@ -168,9 +154,9 @@ export default function Chat() {
           <>
             <div ref={scrollContainerRef} className="relative flex-1 overflow-y-auto" onScroll={handleScroll}>
               {messages.length === 0 ? (
-                <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-                  <div className="glass-panel rounded-3xl p-8 max-w-md">
-                    <h2 className="mb-2 text-2xl font-semibold">What can I help with?</h2>
+                <div className="flex h-full flex-col items-center justify-center p-4 sm:p-8 text-center">
+                  <div className="glass-panel rounded-3xl p-6 sm:p-8 max-w-md w-full">
+                    <h2 className="mb-2 text-xl sm:text-2xl font-semibold">What can I help with?</h2>
                     <p className="text-sm text-muted-foreground">
                       Ask me anything — questions, analysis, creative writing, and more.
                     </p>
