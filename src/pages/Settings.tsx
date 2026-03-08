@@ -186,12 +186,12 @@ export default function Settings() {
 
   return (
     <AppLayout>
-      <div className="flex h-[calc(100vh-4rem)] flex-col overflow-y-auto">
-        <header className="border-b border-border p-4 safe-top">
-          <h1 className="text-xl font-bold text-foreground">Settings</h1>
+      <div className="flex h-[calc(100dvh-4rem)] flex-col overflow-y-auto">
+        <header className="border-b border-border px-4 py-3 sm:p-4 safe-top">
+          <h1 className="text-lg sm:text-xl font-bold text-foreground">Settings</h1>
         </header>
 
-        <div className="flex-1 p-4 space-y-4 max-w-2xl mx-auto w-full">
+        <div className="flex-1 px-3 py-4 sm:px-6 sm:py-5 lg:px-7 space-y-3 sm:space-y-4 max-w-[720px] mx-auto w-full">
           {/* Profile */}
           <section
             className="settings-card cursor-pointer hover:bg-accent/30 transition-colors"

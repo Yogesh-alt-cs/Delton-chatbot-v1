@@ -8,8 +8,8 @@ interface AppLayoutProps {
 
 export function AppLayout({ children, showNav = true }: AppLayoutProps) {
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <main className={showNav ? "flex-1 pb-16" : "flex-1"}>
+    <div className="flex min-h-[100dvh] flex-col bg-background">
+      <main className={showNav ? "flex-1 pb-16 lg:pb-0" : "flex-1"}>
         {children}
       </main>
       {showNav && <BottomNav />}

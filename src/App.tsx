@@ -12,9 +12,7 @@ import { Loader2 } from "lucide-react";
 import Welcome from "@/pages/Welcome";
 import Auth from "@/pages/Auth";
 
-// Lazy load pages
 const Chat = lazy(() => import("@/pages/Chat"));
-const Documents = lazy(() => import("@/pages/Documents"));
 const History = lazy(() => import("@/pages/History"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Profile = lazy(() => import("@/pages/Profile"));
@@ -50,7 +48,6 @@ const App = () => (
                 {/* Protected routes */}
                 <Route path="/chat" element={<AuthGuard><Chat /></AuthGuard>} />
                 <Route path="/chat/:conversationId" element={<AuthGuard><Chat /></AuthGuard>} />
-                <Route path="/documents" element={<AuthGuard><Documents /></AuthGuard>} />
                 <Route path="/history" element={<AuthGuard><History /></AuthGuard>} />
                 <Route path="/settings" element={<AuthGuard><Settings /></AuthGuard>} />
                 <Route path="/profile" element={<AuthGuard><Profile /></AuthGuard>} />
