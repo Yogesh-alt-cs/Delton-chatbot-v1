@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, Menu, ArrowDown, Phone, MessageCircle, Download, Settings, Loader2 } from 'lucide-react';
+import { Plus, Menu, ArrowDown, Phone, MessageCircle, Download, Settings, Loader2, Square, RotateCcw, WifiOff, Check, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
@@ -11,9 +11,13 @@ import { useChat } from '@/hooks/useChat';
 import { useExportData } from '@/hooks/useExportData';
 import { useFeedback } from '@/hooks/useFeedback';
 import { useDailyLimit } from '@/hooks/useDailyLimit';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { useTabTitle } from '@/hooks/useTabTitle';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ImageGenModal } from '@/components/chat/ImageGenModal';
 
 const VoiceConversation = lazy(() => import('@/components/chat/VoiceConversation').then(m => ({ default: m.VoiceConversation })));
 
@@ -27,17 +31,21 @@ export default function Chat() {
   const [mode, setMode] = useState<'text' | 'voice'>('text');
   const [isMicActive, setIsMicActive] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [imageGenOpen, setImageGenOpen] = useState(false);
 
   const { exportSingleConversation } = useExportData();
   const { remainingChats, isLimitReached, incrementUsage, DAILY_LIMIT } = useDailyLimit();
   const { toast } = useToast();
+  const { isOnline, showReconnected } = useOnlineStatus();
 
-  const { messages, isLoading, conversationId, sendMessage, loadConversation, clearChat } = useChat({
+  const { messages, isLoading, conversationId, error, wasStopped, sendMessage, stopGeneration, retryLastMessage, loadConversation, clearChat } = useChat({
     conversationId: urlConversationId,
     onConversationCreated: (conversation) => {
       navigate(`/chat/${conversation.id}`, { replace: true });
     }
   });
+
+  useTabTitle(isLoading);
 
   const { feedbackMap, loadFeedback, toggleFeedback } = useFeedback();
 
@@ -55,13 +63,10 @@ export default function Chat() {
       toast({ title: "Daily limit reached", description: `You've used all ${DAILY_LIMIT} chats for today.`, variant: "destructive" });
       return;
     }
-
-    // Enrich message with document context
     let enrichedContent = content;
     if (document) {
       enrichedContent = `[Document: ${document.name}]\n[Content: ${document.content}]\n\nUser: ${content}`;
     }
-
     await sendMessage(enrichedContent, images);
   }, [isLimitReached, incrementUsage, sendMessage, toast, DAILY_LIMIT]);
 
@@ -79,6 +84,31 @@ export default function Chat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
   }, [messages]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isMod = e.metaKey || e.ctrlKey;
+      if (isMod && e.key === 'k') {
+        e.preventDefault();
+        document.querySelector<HTMLTextAreaElement>('[data-chat-input]')?.focus();
+      }
+      if (isMod && e.key === 'n' && !e.shiftKey) {
+        e.preventDefault();
+        handleNewChat();
+      }
+      if (isMod && e.shiftKey && (e.key === 'h' || e.key === 'H')) {
+        e.preventDefault();
+        setSidebarOpen(prev => !prev);
+      }
+      if (e.key === 'Escape') {
+        setSidebarOpen(false);
+        setImageGenOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   const handleScroll = () => {
     const container = scrollContainerRef.current;
@@ -103,10 +133,30 @@ export default function Chat() {
   return (
     <div className="flex h-[100dvh] bg-background">
       <MicIndicator isActive={isMicActive} />
-
       <ChatSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} onNewChat={handleNewChat} />
 
       <div className="flex flex-1 flex-col min-w-0">
+        {/* Offline / Reconnected banner */}
+        <AnimatePresence>
+          {(!isOnline || showReconnected) && (
+            <motion.div
+              className={cn(
+                "flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium z-50 shrink-0",
+                !isOnline ? "bg-destructive/90 text-destructive-foreground" : "bg-emerald-500/90 text-white"
+              )}
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+            >
+              {!isOnline ? (
+                <><WifiOff className="h-4 w-4" /> No internet connection — Reconnecting...</>
+              ) : (
+                <><Check className="h-4 w-4" /> Back online!</>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Header */}
         <header className="flex h-14 items-center justify-between px-3 sm:px-4 glass-panel-strong safe-top shrink-0 z-10 border-b border-border/30">
           <div className="flex items-center gap-2">
@@ -173,19 +223,42 @@ export default function Chat() {
               ) : (
                 <div className="mx-auto max-w-3xl py-4">
                   {messages.map((message, index) => (
-                    <MessageBubble
-                      key={message.id}
-                      id={message.id}
-                      role={message.role as 'user' | 'assistant'}
-                      content={message.content}
-                      images={message.images}
-                      isStreaming={isLastMessageStreaming && index === messages.length - 1}
-                      feedback={feedbackMap[message.id]}
-                      onFeedback={handleFeedback}
-                      showActions={message.role === 'assistant'}
-                    />
+                    <div key={message.id}>
+                      <MessageBubble
+                        id={message.id}
+                        role={message.role as 'user' | 'assistant'}
+                        content={message.content}
+                        images={message.images}
+                        isStreaming={isLastMessageStreaming && index === messages.length - 1}
+                        feedback={feedbackMap[message.id]}
+                        onFeedback={handleFeedback}
+                        showActions={message.role === 'assistant'}
+                      />
+                      {/* Stopped label */}
+                      {message.stopped && message.role === 'assistant' && (
+                        <p className="text-xs text-muted-foreground italic px-16 -mt-2 mb-2">Generation stopped</p>
+                      )}
+                    </div>
                   ))}
                   {isLoading && !isLastMessageStreaming && <TypingIndicator />}
+
+                  {/* Error with retry */}
+                  {error && !isLoading && (
+                    <motion.div
+                      className="flex items-center gap-2 px-16 py-2"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                    >
+                      <span className="text-sm text-destructive">{error.message}</span>
+                      <button
+                        onClick={retryLastMessage}
+                        className="flex items-center gap-1 text-sm text-primary hover:underline"
+                      >
+                        <RotateCcw className="h-3 w-3" /> Try again
+                      </button>
+                    </motion.div>
+                  )}
+
                   <div ref={messagesEndRef} />
                 </div>
               )}
@@ -207,12 +280,29 @@ export default function Chat() {
 
             <div className="shrink-0 bg-transparent safe-bottom">
               <div className="mx-auto max-w-3xl px-3 pb-3 sm:px-4 sm:pb-4">
-                <ChatInput onSend={handleSendMessage} disabled={isLoading || isLimitReached} onMicStateChange={setIsMicActive} />
+                <ChatInput
+                  onSend={handleSendMessage}
+                  disabled={isLoading || isLimitReached}
+                  isLoading={isLoading}
+                  onStop={stopGeneration}
+                  onMicStateChange={setIsMicActive}
+                  onImageGen={() => setImageGenOpen(true)}
+                />
               </div>
             </div>
           </>
         )}
       </div>
+
+      <ImageGenModal
+        isOpen={imageGenOpen}
+        onClose={() => setImageGenOpen(false)}
+        onImageGenerated={(url, prompt) => {
+          // Send as a message with the image
+          handleSendMessage(`Generated image: "${prompt}"\n\n![Generated Image](${url})`);
+          setImageGenOpen(false);
+        }}
+      />
     </div>
   );
 }
