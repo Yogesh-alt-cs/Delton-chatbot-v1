@@ -12,6 +12,7 @@ import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import { useTheme, type Theme } from '@/contexts/ThemeContext';
 import { useToast } from '@/hooks/use-toast';
 import {
   DropdownMenu,
