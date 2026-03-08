@@ -44,7 +44,7 @@ export function MessageBubble({
         </div>
       )}
 
-      <div className={cn("flex flex-col gap-1.5 max-w-[80%] sm:max-w-[70%]", isUser ? "items-end" : "items-start")}>
+      <div className={cn("flex flex-col gap-1.5 max-w-[85%] sm:max-w-[75%] md:max-w-[70%]", isUser ? "items-end" : "items-start")}>
         {images && images.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-1">
             {images.map((image, index) => (
