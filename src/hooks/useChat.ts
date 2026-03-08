@@ -308,7 +308,8 @@ export function useChat(options: UseChatOptions = {}) {
       };
       setMessages((prev) => [...prev, userMessage]);
 
-      await saveMessage(currentConvId, 'user', content);
+      // Fire-and-forget DB save — don't block UI
+      saveMessage(currentConvId, 'user', content);
 
       // Format message content for vision support
       const formatMessageContent = (text: string, messageImages?: MessageImage[]) => {
