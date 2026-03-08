@@ -1,4 +1,4 @@
-import { Moon, Sun, Monitor, LogOut, User, Bell, Download, FileText, FileJson, FileType, Volume2, Trash2, Sparkles, Globe, Shield, Type, Info, Star, MessageSquare, Sliders, Keyboard } from 'lucide-react';
+import { Moon, Sun, LogOut, User, Bell, Download, FileText, FileJson, FileType, Volume2, Trash2, Sparkles, Globe, Shield, Type, Info, Star, MessageSquare, Sliders, Keyboard, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
