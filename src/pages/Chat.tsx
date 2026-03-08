@@ -11,6 +11,7 @@ import { useChat } from '@/hooks/useChat';
 import { useExportData } from '@/hooks/useExportData';
 import { useFeedback } from '@/hooks/useFeedback';
 import { useDailyLimit } from '@/hooks/useDailyLimit';
+import { useDocumentRAG } from '@/hooks/useDocumentRAG';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
