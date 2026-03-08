@@ -478,12 +478,18 @@ export default function Settings() {
                 <span className="text-sm text-muted-foreground">2.0.0</span>
               </SettingsRow>
               <SettingsRow label="Rate the App">
-                <Button variant="outline" size="sm" className="h-8" onClick={() => window.open('mailto:yogesh29036@gmail.com?subject=Delton%20AI%20-%20App%20Rating&body=Hi%20Yogesh,%0A%0AI%20would%20like%20to%20rate%20Delton%20AI:%0A%0ARating%20(1-5):%20%0AComments:%20', '_blank')}>
+                <Button variant="outline" size="sm" className="h-8" onClick={() => {
+                  window.location.href = 'mailto:yogesh29036@gmail.com?subject=Delton%20App%20Rating&body=Hi%20Yogesh%2C%0A%0AI%20would%20like%20to%20rate%20the%20Delton%20app.%0A%0ARating%3A%0AComments%3A';
+                  toast({ title: 'Opening email', description: 'Opening email to send your rating.' });
+                }}>
                   <Star className="mr-1.5 h-3.5 w-3.5" />Rate
                 </Button>
               </SettingsRow>
               <SettingsRow label="Send Feedback">
-                <Button variant="outline" size="sm" className="h-8" onClick={() => window.open('mailto:yogesh29036@gmail.com?subject=Delton%20AI%20-%20Feedback&body=Hi%20Yogesh,%0A%0AHere%20is%20my%20feedback%20for%20Delton%20AI:%0A%0A', '_blank')}>
+                <Button variant="outline" size="sm" className="h-8" onClick={() => {
+                  window.location.href = 'mailto:yogesh29036@gmail.com?subject=Delton%20App%20Feedback&body=Hi%20Yogesh%2C%0A%0AI%20would%20like%20to%20share%20feedback%20about%20the%20Delton%20app.%0A%0AFeedback%3A';
+                  toast({ title: 'Opening email', description: 'Opening email to send your feedback.' });
+                }}>
                   <MessageSquare className="mr-1.5 h-3.5 w-3.5" />Feedback
                 </Button>
               </SettingsRow>
