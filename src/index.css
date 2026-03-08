@@ -389,6 +389,11 @@
     @apply rounded-xl border border-border bg-card p-4;
   }
 
+  [data-theme="amoled"] .settings-card {
+    background: hsl(0 0% 0%);
+    border-color: hsl(0 0% 100% / 0.08);
+  }
+
   .settings-card-danger {
     @apply border-destructive/30;
   }
