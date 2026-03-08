@@ -188,14 +188,14 @@
 
     /* Glass tokens - amoled: opaque black, no blur */
     --glass-bg: 0 0% 0%;
-    --glass-border: 0 0% 100% / 0.06;
+    --glass-border: 0 0% 100% / 0.08;
     --glass-glow: 199 89% 48% / 0.04;
     --glass-blur: 0px;
 
     /* Chat tokens */
     --chat-user-bubble: 224 76% 48%;
     --chat-user-text: 0 0% 100%;
-    --chat-ai-bubble: 0 0% 7%;
+    --chat-ai-bubble: 0 0% 6%;
     --chat-ai-text: 0 0% 100%;
 
     /* Sidebar */
@@ -203,11 +203,11 @@
     --sidebar-foreground: 0 0% 100%;
     --sidebar-primary: 199 89% 48%;
     --sidebar-primary-foreground: 0 0% 0%;
-    --sidebar-accent: 0 0% 5%;
+    --sidebar-accent: 0 0% 6%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 0 0% 100% / 0.06;
+    --sidebar-border: 0 0% 100% / 0.08;
     --sidebar-ring: 199 89% 48%;
-    --sidebar: 0 0% 3%;
+    --sidebar: 0 0% 0%;
 
     --chart-1: 199 95% 73%;
     --chart-2: 211 96% 78%;
