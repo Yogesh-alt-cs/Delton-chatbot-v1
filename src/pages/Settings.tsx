@@ -140,13 +140,16 @@ export default function Settings() {
   const [highContrast, setHighContrast] = useState(false);
   const [fontSize, setFontSize] = useState('medium');
 
-  const currentTheme = settings?.theme || 'system';
+  const { user, signOut } = useAuth();
   const notificationsEnabled = settings?.notifications_enabled ?? true;
   const currentVoice = settings?.tts_voice_name || 'default';
   const currentStyle = settings?.personalization_style || 'balanced';
   const currentLanguage = settings?.voice_language || 'en-US';
 
-  const handleThemeChange = (theme: 'light' | 'dark' | 'system') => updateSettings({ theme });
+  const handleThemeChange = (theme: Theme) => {
+    setAppTheme(theme);
+    updateSettings({ theme });
+  };
 
   const handleNotificationsChange = async (enabled: boolean) => {
     if (enabled && notificationsSupported) {
