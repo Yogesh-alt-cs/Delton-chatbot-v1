@@ -126,7 +126,7 @@ function SettingsRow({ label, description, children }: {
 }
 
 export default function Settings() {
-  const { user, signOut } = useAuth();
+  const { theme: currentTheme, setTheme: setAppTheme } = useTheme();
   const { settings, updateSettings, clearAllHistory } = useUserSettings();
   const { profile } = useProfile();
   const { exportConversations } = useExportData();
