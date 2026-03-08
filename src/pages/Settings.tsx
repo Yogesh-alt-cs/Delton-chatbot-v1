@@ -40,9 +40,9 @@ import {
 } from '@/components/ui/alert-dialog';
 
 const themeOptions = [
-  { value: 'light', label: 'Light', icon: Sun },
-  { value: 'dark', label: 'Dark', icon: Moon },
-  { value: 'system', label: 'System', icon: Monitor },
+  { value: 'light' as Theme, label: 'Light', emoji: '☀️', previewBg: '#F5F5F5', previewBubble: '#2563EB', previewAi: '#F0F0F0' },
+  { value: 'dark' as Theme, label: 'Dark', emoji: '🌙', previewBg: '#111118', previewBubble: '#2563EB', previewAi: '#1E1E2E' },
+  { value: 'amoled' as Theme, label: 'AMOLED', emoji: '⚫', previewBg: '#000000', previewBubble: '#1D4ED8', previewAi: '#111111' },
 ] as const;
 
 const styleOptions = [
