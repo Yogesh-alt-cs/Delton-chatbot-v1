@@ -234,4 +234,81 @@
                 0 0 100px 30px hsl(var(--primary) / 0.25),
                 0 0 150px 50px hsl(var(--primary) / 0.1);
   }
+
+  /* Auth page styles */
+  .auth-gradient-bg {
+    background: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--accent)) 50%, hsl(var(--background)) 100%);
+  }
+
+  .auth-input {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid hsl(var(--border));
+    border-radius: 0;
+    padding: 0.75rem 0;
+    font-size: 0.875rem;
+    color: hsl(var(--foreground));
+    outline: none;
+    transition: border-color 0.3s ease;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .auth-input::placeholder {
+    color: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  .auth-input:focus {
+    border-bottom-color: hsl(var(--primary));
+    box-shadow: 0 2px 8px -2px hsl(var(--primary) / 0.3);
+  }
+
+  .auth-input-error {
+    border-bottom-color: hsl(var(--destructive));
+  }
+
+  .auth-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% center; }
+    100% { background-position: 200% center; }
+  }
+
+  .auth-btn-shimmer:hover:not(:disabled) {
+    background-image: linear-gradient(
+      90deg,
+      hsl(var(--primary)) 0%,
+      hsl(var(--primary) / 0.7) 40%,
+      hsl(var(--primary)) 60%,
+      hsl(var(--primary)) 100%
+    );
+    background-size: 200% auto;
+    animation: shimmer 2s linear infinite;
+  }
+
+  /* Settings card styles */
+  .settings-card {
+    @apply rounded-xl border border-border bg-card p-4;
+  }
+
+  .settings-card-danger {
+    @apply border-destructive/30;
+  }
+
+  /* Send button ripple */
+  .send-btn-ripple:active::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: hsl(var(--primary-foreground) / 0.2);
+    animation: ripple 0.4s ease-out;
+  }
+
+  @keyframes ripple {
+    from { transform: scale(0); opacity: 1; }
+    to { transform: scale(2.5); opacity: 0; }
+  }
 }
