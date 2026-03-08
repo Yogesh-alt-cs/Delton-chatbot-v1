@@ -155,6 +155,7 @@
   }
 
   /* ===== AMOLED THEME ===== */
+  html[data-theme="amoled"],
   [data-theme="amoled"] {
     --background: 0 0% 0%;
     --foreground: 0 0% 100%;
