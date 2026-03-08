@@ -41,8 +41,9 @@ export function useUserSettings() {
       if (data) {
         setSettings(data as UserSettings);
         // Sync theme from database
-        if (data.theme === 'light' || data.theme === 'dark' || data.theme === 'system') {
-          setTheme(data.theme);
+        const t = data.theme;
+        if (t === 'light' || t === 'dark' || t === 'amoled') {
+          setTheme(t as Theme);
         }
       }
     } catch (error) {
