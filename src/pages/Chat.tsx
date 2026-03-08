@@ -42,7 +42,13 @@ export default function Chat() {
 
   const { feedbackMap, loadFeedback, toggleFeedback } = useFeedback();
 
-  const handleSendMessage = useCallback(async (content: string, images?: import('@/lib/types').MessageImage[]) => {
+  const { uploadDocument, formatForContext, isProcessing: isDocProcessing } = useDocumentRAG();
+
+  const handleSendMessage = useCallback(async (
+    content: string,
+    images?: import('@/lib/types').MessageImage[],
+    document?: { file: File; name: string; type: string }
+  ) => {
     if (isLimitReached) {
       toast({ title: "Daily limit reached", description: `You've used all ${DAILY_LIMIT} chats for today.`, variant: "destructive" });
       return;
@@ -52,8 +58,18 @@ export default function Chat() {
       toast({ title: "Daily limit reached", description: `You've used all ${DAILY_LIMIT} chats for today.`, variant: "destructive" });
       return;
     }
-    await sendMessage(content, images);
-  }, [isLimitReached, incrementUsage, sendMessage, toast, DAILY_LIMIT]);
+
+    let enrichedContent = content;
+    if (document) {
+      toast({ title: '📄 Analyzing document...', description: document.name });
+      const parsed = await uploadDocument(document.file, conversationId);
+      if (parsed) {
+        enrichedContent = content + formatForContext(parsed);
+      }
+    }
+
+    await sendMessage(enrichedContent, images);
+  }, [isLimitReached, incrementUsage, sendMessage, toast, DAILY_LIMIT, uploadDocument, formatForContext, conversationId]);
 
   useEffect(() => {
     if (urlConversationId && urlConversationId !== conversationId) {
