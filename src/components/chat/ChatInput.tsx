@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, KeyboardEvent } from 'react';
-import { Send, Plus, X, Mic, MicOff, RotateCcw, Check, Loader2, FileText } from 'lucide-react';
+import { Send, Plus, X, Mic, MicOff, RotateCcw, Check, Loader2, FileText, Square, Palette } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -29,9 +29,7 @@ async function extractTextFromTxtOrCsv(file: File): Promise<string> {
 
 async function extractTextFromPdf(file: File): Promise<string> {
   const pdfjsLib = await import('pdfjs-dist');
-  // Use the bundled worker
   pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   const pages: string[] = [];
@@ -143,10 +141,13 @@ function CameraDialog({ isOpen, onClose, onCapture }: {
 interface ChatInputProps {
   onSend: (message: string, images?: MessageImage[], document?: DocumentAttachment) => void;
   disabled?: boolean;
+  isLoading?: boolean;
+  onStop?: () => void;
   onMicStateChange?: (isActive: boolean) => void;
+  onImageGen?: () => void;
 }
 
-export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, isLoading, onStop, onMicStateChange, onImageGen }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const [interimText, setInterimText] = useState('');
   const [language, setLanguage] = useState('en-US');
@@ -157,6 +158,7 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
   const [sendAnimating, setSendAnimating] = useState(false);
   const [document, setDocument] = useState<DocumentAttachment | null>(null);
   const [docLoading, setDocLoading] = useState(false);
+  const [showShiftHint, setShowShiftHint] = useState(() => !localStorage.getItem('delton_shift_hint_shown'));
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
@@ -182,6 +184,31 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
 
   useEffect(() => { onMicStateChange?.(isListening); }, [isListening, onMicStateChange]);
 
+  // Clipboard paste for images
+  useEffect(() => {
+    const el = window.document;
+    const handlePaste = async (e: ClipboardEvent) => {
+      const items = Array.from(e.clipboardData?.items || []);
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (!file || images.length >= 4) return;
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve((reader.result as string).split(',')[1]);
+            reader.onerror = reject;
+          });
+          setImages((prev) => [...prev, { url: URL.createObjectURL(file), base64, mimeType: file.type }]);
+          break;
+        }
+      }
+    };
+    el.addEventListener('paste', handlePaste);
+    return () => el.removeEventListener('paste', handlePaste);
+  }, [images]);
+
   const handleSend = () => {
     const trimmed = message.trim();
     if ((!trimmed && images.length === 0 && !document) || disabled) return;
@@ -189,8 +216,14 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
     setSendAnimating(true);
     setTimeout(() => setSendAnimating(false), 400);
 
+    // Dismiss shift hint on first send
+    if (showShiftHint) {
+      setShowShiftHint(false);
+      localStorage.setItem('delton_shift_hint_shown', '1');
+    }
+
     onSend(
-      trimmed || (document ? `Analyze this document` : 'What do you see in this image?'),
+      trimmed || (document ? 'Analyze this document' : 'What do you see in this image?'),
       images.length > 0 ? images : undefined,
       document || undefined,
     );
@@ -202,7 +235,10 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
   };
 
   const handleInput = () => {
@@ -235,24 +271,16 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
   const handleDocumentFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024) return; // 10MB limit
+    if (file.size > 10 * 1024 * 1024) return;
 
     setDocLoading(true);
     try {
       let text = '';
       const ext = file.name.split('.').pop()?.toLowerCase();
-
-      if (ext === 'txt' || ext === 'csv') {
-        text = await extractTextFromTxtOrCsv(file);
-      } else if (ext === 'pdf') {
-        text = await extractTextFromPdf(file);
-      } else if (ext === 'docx') {
-        text = await extractTextFromDocx(file);
-      }
-
-      // Truncate to ~30k chars to stay within context limits
+      if (ext === 'txt' || ext === 'csv') text = await extractTextFromTxtOrCsv(file);
+      else if (ext === 'pdf') text = await extractTextFromPdf(file);
+      else if (ext === 'docx') text = await extractTextFromDocx(file);
       if (text.length > 30000) text = text.slice(0, 30000) + '\n\n[Document truncated...]';
-
       setDocument({ name: file.name, content: text });
     } catch (err) {
       console.error('Document extraction error:', err);
@@ -264,34 +292,22 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
 
   const displayText = interimText ? `${message} ${interimText}`.trim() : message;
   const hasContent = message.trim() || images.length > 0 || !!document;
+  const charCount = message.length;
 
   return (
     <div>
       {/* Document chip */}
       <AnimatePresence>
         {(document || docLoading) && (
-          <motion.div
-            className="flex items-center gap-2 mb-2 px-2"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-          >
+          <motion.div className="flex items-center gap-2 mb-2 px-2" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
             <div className="flex items-center gap-2 rounded-xl glass-panel px-3 py-2 text-sm">
               <FileText className="h-4 w-4 text-primary shrink-0" />
               {docLoading ? (
-                <span className="text-muted-foreground flex items-center gap-1.5">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Processing...
-                </span>
+                <span className="text-muted-foreground flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" />Processing...</span>
               ) : (
                 <>
                   <span className="truncate max-w-[200px]">{document?.name}</span>
-                  <button
-                    onClick={() => setDocument(null)}
-                    className="ml-1 p-0.5 rounded-full hover:bg-accent/50 transition-colors"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
+                  <button onClick={() => setDocument(null)} className="ml-1 p-0.5 rounded-full hover:bg-accent/50 transition-colors"><X className="h-3 w-3" /></button>
                 </>
               )}
             </div>
@@ -334,7 +350,7 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
               attachmentOpen && 'bg-accent/50 text-foreground'
             )}
             onClick={() => setAttachmentOpen(!attachmentOpen)}
-            disabled={disabled}
+            disabled={disabled && !isLoading}
             whileTap={{ scale: 0.9 }}
             animate={{ rotate: attachmentOpen ? 45 : 0 }}
             transition={{ duration: 0.2 }}
@@ -356,25 +372,45 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
         <input ref={docInputRef} type="file" accept=".pdf,.docx,.txt,.csv" onChange={handleDocumentFile} className="hidden" />
 
         {/* Text input */}
-        <Textarea
-          ref={textareaRef}
-          value={displayText}
-          onChange={(e) => { setMessage(e.target.value); setInterimText(''); }}
-          onKeyDown={handleKeyDown}
-          onInput={handleInput}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          placeholder={isListening ? 'Listening...' : 'Message Delton...'}
-          className={cn(
-            'min-h-[40px] max-h-40 resize-none border-0 bg-transparent p-2 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/40',
-            isListening && 'text-primary'
+        <div className="flex-1 relative">
+          <Textarea
+            ref={textareaRef}
+            data-chat-input
+            value={displayText}
+            onChange={(e) => { setMessage(e.target.value); setInterimText(''); }}
+            onKeyDown={handleKeyDown}
+            onInput={handleInput}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            placeholder={isListening ? 'Listening...' : 'Message Delton...'}
+            className={cn(
+              'min-h-[40px] max-h-40 resize-none border-0 bg-transparent p-2 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/40',
+              isListening && 'text-primary'
+            )}
+            rows={1}
+            disabled={disabled && !isLoading}
+          />
+          {/* Character counter */}
+          {charCount > 500 && (
+            <span className="absolute bottom-1 right-2 text-[10px] text-muted-foreground/50">{charCount} chars</span>
           )}
-          rows={1}
-          disabled={disabled}
-        />
+        </div>
 
-        {/* Right side: mic + send */}
+        {/* Right side: image gen + mic + send/stop */}
         <div className="flex items-center gap-1 shrink-0">
+          {/* Image gen button */}
+          {onImageGen && (
+            <motion.button
+              type="button"
+              className="flex items-center justify-center h-10 w-10 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+              onClick={onImageGen}
+              whileTap={{ scale: 0.9 }}
+              title="Generate Image"
+            >
+              <Palette className="h-4 w-4" />
+            </motion.button>
+          )}
+
           {isSupported && (
             <motion.button
               type="button"
@@ -383,7 +419,7 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
                 isListening ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
               )}
               onClick={toggleListening}
-              disabled={disabled}
+              disabled={disabled && !isLoading}
               whileTap={{ scale: 0.9 }}
             >
               <AnimatePresence mode="wait">
@@ -399,25 +435,53 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
             </motion.button>
           )}
 
-          <motion.button
-            type="button"
-            className={cn(
-              'relative flex items-center justify-center h-10 w-10 rounded-full transition-all overflow-hidden',
-              hasContent && !disabled
-                ? 'bg-primary text-primary-foreground shadow-md'
-                : 'bg-accent/50 text-muted-foreground'
-            )}
-            disabled={!hasContent || disabled}
-            onClick={handleSend}
-            whileHover={hasContent && !disabled ? { scale: 1.08 } : {}}
-            whileTap={hasContent && !disabled ? { scale: 0.85 } : {}}
-            animate={sendAnimating ? { rotate: [0, 15, -5, 0], scale: [1, 1.2, 0.95, 1] } : {}}
-            transition={sendAnimating ? { duration: 0.4, ease: 'easeOut' } : {}}
-          >
-            <Send className="h-4 w-4" />
-          </motion.button>
+          {/* Send or Stop button */}
+          {isLoading ? (
+            <motion.button
+              type="button"
+              className="flex items-center justify-center h-10 w-10 rounded-full bg-destructive text-destructive-foreground shadow-md"
+              onClick={onStop}
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.85 }}
+              title="Stop generation"
+            >
+              <Square className="h-4 w-4 fill-current" />
+            </motion.button>
+          ) : (
+            <motion.button
+              type="button"
+              className={cn(
+                'relative flex items-center justify-center h-10 w-10 rounded-full transition-all overflow-hidden',
+                hasContent && !disabled
+                  ? 'bg-primary text-primary-foreground shadow-md'
+                  : 'bg-accent/50 text-muted-foreground'
+              )}
+              disabled={!hasContent || disabled}
+              onClick={handleSend}
+              whileHover={hasContent && !disabled ? { scale: 1.08 } : {}}
+              whileTap={hasContent && !disabled ? { scale: 0.85 } : {}}
+              animate={sendAnimating ? { rotate: [0, 15, -5, 0], scale: [1, 1.2, 0.95, 1] } : {}}
+              transition={sendAnimating ? { duration: 0.4, ease: 'easeOut' } : {}}
+            >
+              <Send className="h-4 w-4" />
+            </motion.button>
+          )}
         </div>
       </motion.div>
+
+      {/* Shift+Enter hint (shown once) */}
+      <AnimatePresence>
+        {showShiftHint && isFocused && (
+          <motion.p
+            className="text-center text-[10px] text-muted-foreground/40 mt-1"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            Shift+Enter for new line
+          </motion.p>
+        )}
+      </AnimatePresence>
 
       {/* Listening indicator */}
       <AnimatePresence>
