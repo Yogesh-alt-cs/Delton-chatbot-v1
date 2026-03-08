@@ -79,8 +79,8 @@ export default function Auth() {
   };
 
   const stagger = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.12 } },
+    hidden: { opacity: 0 as number },
+    show: { opacity: 1 as number, transition: { staggerChildren: 0.12 } },
   };
   const fadeUp = {
     hidden: { opacity: 0, y: 20 },
