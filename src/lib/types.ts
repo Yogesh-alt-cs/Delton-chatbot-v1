@@ -11,6 +11,7 @@ export interface Message {
   content: string;
   created_at: string;
   images?: MessageImage[];
+  stopped?: boolean;
 }
 
 export interface Conversation {
