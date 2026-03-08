@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, KeyboardEvent } from 'react';
-import { Send, Plus, X, Mic, MicOff, RotateCcw, Check, Loader2 } from 'lucide-react';
+import { Send, Plus, X, Mic, MicOff, RotateCcw, Check, Loader2, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,6 +15,47 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+
+// --- Document text extraction utilities ---
+
+async function extractTextFromTxtOrCsv(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsText(file);
+  });
+}
+
+async function extractTextFromPdf(file: File): Promise<string> {
+  const pdfjsLib = await import('pdfjs-dist');
+  // Use the bundled worker
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const pages: string[] = [];
+  for (let i = 1; i <= Math.min(pdf.numPages, 50); i++) {
+    const page = await pdf.getPage(i);
+    const textContent = await page.getTextContent();
+    pages.push(textContent.items.map((item: any) => item.str).join(' '));
+  }
+  return pages.join('\n\n');
+}
+
+async function extractTextFromDocx(file: File): Promise<string> {
+  const mammoth = await import('mammoth');
+  const arrayBuffer = await file.arrayBuffer();
+  const result = await mammoth.extractRawText({ arrayBuffer });
+  return result.value;
+}
+
+export interface DocumentAttachment {
+  name: string;
+  content: string;
+}
+
+// --- Camera Dialog ---
 
 function CameraDialog({ isOpen, onClose, onCapture }: {
   isOpen: boolean;
@@ -97,8 +138,10 @@ function CameraDialog({ isOpen, onClose, onCapture }: {
   );
 }
 
+// --- Main ChatInput ---
+
 interface ChatInputProps {
-  onSend: (message: string, images?: MessageImage[]) => void;
+  onSend: (message: string, images?: MessageImage[], document?: DocumentAttachment) => void;
   disabled?: boolean;
   onMicStateChange?: (isActive: boolean) => void;
 }
@@ -112,8 +155,11 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
   const [showCamera, setShowCamera] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [sendAnimating, setSendAnimating] = useState(false);
+  const [document, setDocument] = useState<DocumentAttachment | null>(null);
+  const [docLoading, setDocLoading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -138,15 +184,20 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
 
   const handleSend = () => {
     const trimmed = message.trim();
-    if ((!trimmed && images.length === 0) || disabled) return;
+    if ((!trimmed && images.length === 0 && !document) || disabled) return;
 
     setSendAnimating(true);
     setTimeout(() => setSendAnimating(false), 400);
 
-    onSend(trimmed || 'What do you see in this image?', images.length > 0 ? images : undefined);
+    onSend(
+      trimmed || (document ? `Analyze this document` : 'What do you see in this image?'),
+      images.length > 0 ? images : undefined,
+      document || undefined,
+    );
     setMessage('');
     setInterimText('');
     setImages([]);
+    setDocument(null);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
   };
 
@@ -181,11 +232,73 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
     if (photoInputRef.current) photoInputRef.current.value = '';
   };
 
+  const handleDocumentFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) return; // 10MB limit
+
+    setDocLoading(true);
+    try {
+      let text = '';
+      const ext = file.name.split('.').pop()?.toLowerCase();
+
+      if (ext === 'txt' || ext === 'csv') {
+        text = await extractTextFromTxtOrCsv(file);
+      } else if (ext === 'pdf') {
+        text = await extractTextFromPdf(file);
+      } else if (ext === 'docx') {
+        text = await extractTextFromDocx(file);
+      }
+
+      // Truncate to ~30k chars to stay within context limits
+      if (text.length > 30000) text = text.slice(0, 30000) + '\n\n[Document truncated...]';
+
+      setDocument({ name: file.name, content: text });
+    } catch (err) {
+      console.error('Document extraction error:', err);
+    } finally {
+      setDocLoading(false);
+      if (docInputRef.current) docInputRef.current.value = '';
+    }
+  };
+
   const displayText = interimText ? `${message} ${interimText}`.trim() : message;
-  const hasContent = message.trim() || images.length > 0;
+  const hasContent = message.trim() || images.length > 0 || !!document;
 
   return (
     <div>
+      {/* Document chip */}
+      <AnimatePresence>
+        {(document || docLoading) && (
+          <motion.div
+            className="flex items-center gap-2 mb-2 px-2"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            <div className="flex items-center gap-2 rounded-xl glass-panel px-3 py-2 text-sm">
+              <FileText className="h-4 w-4 text-primary shrink-0" />
+              {docLoading ? (
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Processing...
+                </span>
+              ) : (
+                <>
+                  <span className="truncate max-w-[200px]">{document?.name}</span>
+                  <button
+                    onClick={() => setDocument(null)}
+                    className="ml-1 p-0.5 rounded-full hover:bg-accent/50 transition-colors"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Image previews */}
       <AnimatePresence>
         {images.length > 0 && (
@@ -234,11 +347,13 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
             onClose={() => setAttachmentOpen(false)}
             onCameraOpen={() => setShowCamera(true)}
             onPhotoSelect={() => photoInputRef.current?.click()}
+            onDocumentSelect={() => docInputRef.current?.click()}
             disabled={disabled}
           />
         </div>
 
         <input ref={photoInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple onChange={handlePhotoFiles} className="hidden" />
+        <input ref={docInputRef} type="file" accept=".pdf,.docx,.txt,.csv" onChange={handleDocumentFile} className="hidden" />
 
         {/* Text input */}
         <Textarea

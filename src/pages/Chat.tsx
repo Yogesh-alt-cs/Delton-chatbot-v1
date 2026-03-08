@@ -43,7 +43,8 @@ export default function Chat() {
 
   const handleSendMessage = useCallback(async (
     content: string,
-    images?: import('@/lib/types').MessageImage[]
+    images?: import('@/lib/types').MessageImage[],
+    document?: import('@/components/chat/ChatInput').DocumentAttachment,
   ) => {
     if (isLimitReached) {
       toast({ title: "Daily limit reached", description: `You've used all ${DAILY_LIMIT} chats for today.`, variant: "destructive" });
@@ -54,7 +55,14 @@ export default function Chat() {
       toast({ title: "Daily limit reached", description: `You've used all ${DAILY_LIMIT} chats for today.`, variant: "destructive" });
       return;
     }
-    await sendMessage(content, images);
+
+    // Enrich message with document context
+    let enrichedContent = content;
+    if (document) {
+      enrichedContent = `[Document: ${document.name}]\n[Content: ${document.content}]\n\nUser: ${content}`;
+    }
+
+    await sendMessage(enrichedContent, images);
   }, [isLimitReached, incrementUsage, sendMessage, toast, DAILY_LIMIT]);
 
   useEffect(() => {
