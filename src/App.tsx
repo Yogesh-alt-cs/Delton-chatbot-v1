@@ -12,13 +12,15 @@ import { Loader2 } from "lucide-react";
 import Welcome from "@/pages/Welcome";
 import Auth from "@/pages/Auth";
 
-// Lazy load authenticated pages for faster initial load
+// Lazy load pages
 const Chat = lazy(() => import("@/pages/Chat"));
 const Documents = lazy(() => import("@/pages/Documents"));
 const History = lazy(() => import("@/pages/History"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const ProfileEdit = lazy(() => import("@/pages/ProfileEdit"));
+const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 import NotFound from "@/pages/NotFound";
 
 const LazyFallback = () => (
