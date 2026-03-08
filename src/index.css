@@ -186,11 +186,11 @@
     --input: 0 0% 5%;
     --ring: 199 89% 48%;
 
-    /* Glass tokens - amoled */
-    --glass-bg: 0 0% 100% / 0.04;
+    /* Glass tokens - amoled: opaque black, no blur */
+    --glass-bg: 0 0% 0%;
     --glass-border: 0 0% 100% / 0.06;
     --glass-glow: 199 89% 48% / 0.04;
-    --glass-blur: 24px;
+    --glass-blur: 0px;
 
     /* Chat tokens */
     --chat-user-bubble: 224 76% 48%;
