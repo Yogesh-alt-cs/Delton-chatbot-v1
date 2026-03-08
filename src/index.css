@@ -289,6 +289,9 @@
 
   [data-theme="amoled"] .glass-panel,
   [data-theme="amoled"] .glass-panel-strong {
+    background: hsl(0 0% 0%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     box-shadow: none;
   }
 
