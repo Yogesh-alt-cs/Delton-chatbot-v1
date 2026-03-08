@@ -186,6 +186,7 @@ export function ChatInput({ onSend, disabled, isLoading, onStop, onMicStateChang
 
   // Clipboard paste for images
   useEffect(() => {
+    const el = window.document;
     const handlePaste = async (e: ClipboardEvent) => {
       const items = Array.from(e.clipboardData?.items || []);
       for (const item of items) {
@@ -204,8 +205,8 @@ export function ChatInput({ onSend, disabled, isLoading, onStop, onMicStateChang
         }
       }
     };
-    document.addEventListener('paste', handlePaste);
-    return () => document.removeEventListener('paste', handlePaste);
+    el.addEventListener('paste', handlePaste);
+    return () => el.removeEventListener('paste', handlePaste);
   }, [images]);
 
   const handleSend = () => {
