@@ -7,67 +7,72 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --background: 220 20% 97%;
-    --foreground: 222 47% 11%;
+  /* ===== LIGHT THEME ===== */
+  :root,
+  [data-theme="light"] {
+    --background: 0 0% 96%;
+    --foreground: 0 0% 7%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 0 0% 7%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 0 0% 7%;
 
-    --primary: 200 98% 39%;
-    --primary-foreground: 204 100% 97%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 215 24% 26%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 0 0% 88%;
+    --secondary-foreground: 0 0% 33%;
 
-    --muted: 215 20% 65%;
-    --muted-foreground: 222 47% 11%;
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 33%;
 
-    --accent: 210 40% 98%;
-    --accent-foreground: 215 19% 34%;
+    --accent: 0 0% 94%;
+    --accent-foreground: 0 0% 33%;
 
     --destructive: 0 72% 50%;
     --destructive-foreground: 0 85% 97%;
 
-    --border: 212 26% 88%;
-    --input: 212 26% 88%;
-    --ring: 200 98% 39%;
+    --border: 0 0% 88%;
+    --input: 0 0% 94%;
+    --ring: 217 91% 60%;
 
     --radius: 0.75rem;
 
     /* Glass tokens */
-    --glass-bg: 0 0% 100% / 0.6;
-    --glass-border: 0 0% 100% / 0.18;
-    --glass-glow: 200 98% 60% / 0.08;
+    --glass-bg: 0 0% 100% / 0.7;
+    --glass-border: 0 0% 0% / 0.08;
+    --glass-glow: 217 91% 60% / 0.08;
     --glass-blur: 24px;
 
     /* Chat tokens */
     --chat-user-bubble: 217 91% 60%;
     --chat-user-text: 0 0% 100%;
-    --chat-ai-bubble: 0 0% 100% / 0.7;
-    --chat-ai-text: 222 47% 11%;
+    --chat-ai-bubble: 0 0% 94%;
+    --chat-ai-text: 0 0% 7%;
 
     /* Sidebar */
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 200 98% 39%;
-    --sidebar-primary-foreground: 204 100% 97%;
-    --sidebar-accent: 215 24% 26%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 212 26% 88%;
-    --sidebar-ring: 200 98% 39%;
+    --sidebar-foreground: 0 0% 7%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 94%;
+    --sidebar-accent-foreground: 0 0% 33%;
+    --sidebar-border: 0 0% 88%;
+    --sidebar-ring: 217 91% 60%;
     --sidebar: 0 0% 100%;
-    --chart-1: 198 93% 59%;
+
+    --chart-1: 217 91% 60%;
     --chart-2: 213 93% 67%;
-    --chart-3: 215 20% 65%;
-    --chart-4: 215 16% 46%;
-    --chart-5: 215 19% 34%;
+    --chart-3: 0 0% 60%;
+    --chart-4: 0 0% 46%;
+    --chart-5: 0 0% 34%;
+
     --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
     --font-serif: 'Lora', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
     --font-mono: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+
     --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
     --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
     --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
@@ -80,62 +85,65 @@
     --spacing: 0.25rem;
   }
 
-  .dark {
-    --background: 225 15% 6%;
-    --foreground: 210 40% 96%;
+  /* ===== DARK THEME ===== */
+  [data-theme="dark"] {
+    --background: 232 30% 5%;
+    --foreground: 210 40% 94%;
 
-    --card: 225 15% 10%;
-    --card-foreground: 210 40% 96%;
+    --card: 232 25% 11%;
+    --card-foreground: 210 40% 94%;
 
-    --popover: 225 15% 10%;
-    --popover-foreground: 210 40% 96%;
+    --popover: 232 25% 11%;
+    --popover-foreground: 210 40% 94%;
 
-    --primary: 198 93% 59%;
-    --primary-foreground: 204 80% 8%;
+    --primary: 199 89% 48%;
+    --primary-foreground: 232 30% 5%;
 
-    --secondary: 212 26% 83%;
-    --secondary-foreground: 228 84% 4%;
+    --secondary: 232 15% 20%;
+    --secondary-foreground: 210 40% 94%;
 
-    --muted: 215 16% 46%;
-    --muted-foreground: 210 40% 80%;
+    --muted: 232 15% 20%;
+    --muted-foreground: 0 0% 53%;
 
-    --accent: 225 15% 14%;
-    --accent-foreground: 215 20% 65%;
+    --accent: 232 25% 11%;
+    --accent-foreground: 0 0% 53%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 85% 97%;
 
-    --border: 225 12% 16%;
-    --input: 225 12% 16%;
-    --ring: 198 93% 59%;
+    --border: 0 0% 100% / 0.08;
+    --input: 232 20% 16%;
+    --ring: 199 89% 48%;
 
     /* Glass tokens - dark */
     --glass-bg: 0 0% 100% / 0.06;
     --glass-border: 0 0% 100% / 0.08;
-    --glass-glow: 198 93% 59% / 0.06;
+    --glass-glow: 199 89% 48% / 0.06;
     --glass-blur: 24px;
 
     /* Chat tokens */
-    --chat-user-bubble: 217 91% 55%;
+    --chat-user-bubble: 217 91% 60%;
     --chat-user-text: 0 0% 100%;
-    --chat-ai-bubble: 0 0% 100% / 0.06;
-    --chat-ai-text: 210 40% 96%;
+    --chat-ai-bubble: 232 20% 16%;
+    --chat-ai-text: 210 40% 94%;
 
     /* Sidebar */
-    --sidebar-background: 225 15% 8%;
-    --sidebar-foreground: 210 40% 96%;
-    --sidebar-primary: 198 93% 59%;
-    --sidebar-primary-foreground: 204 80% 8%;
-    --sidebar-accent: 215 20% 65%;
-    --sidebar-accent-foreground: 228 84% 4%;
-    --sidebar-border: 225 12% 16%;
-    --sidebar-ring: 198 93% 59%;
-    --sidebar: 225 15% 10%;
+    --sidebar-background: 232 25% 7%;
+    --sidebar-foreground: 210 40% 94%;
+    --sidebar-primary: 199 89% 48%;
+    --sidebar-primary-foreground: 232 30% 5%;
+    --sidebar-accent: 232 15% 20%;
+    --sidebar-accent-foreground: 210 40% 94%;
+    --sidebar-border: 0 0% 100% / 0.08;
+    --sidebar-ring: 199 89% 48%;
+    --sidebar: 232 25% 9%;
+
     --chart-1: 199 95% 73%;
     --chart-2: 211 96% 78%;
-    --chart-3: 215 20% 65%;
-    --chart-4: 215 16% 46%;
-    --chart-5: 215 19% 34%;
+    --chart-3: 0 0% 60%;
+    --chart-4: 0 0% 46%;
+    --chart-5: 0 0% 34%;
+
     --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.1);
     --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.1);
     --shadow-sm: 0 2px 4px 0px hsl(0 0% 0% / 0.2), 0 1px 2px -1px hsl(0 0% 0% / 0.2);
@@ -145,11 +153,82 @@
     --shadow-xl: 0 8px 24px 0px hsl(0 0% 0% / 0.35), 0 8px 10px -1px hsl(0 0% 0% / 0.2);
     --shadow-2xl: 0 12px 48px 0px hsl(0 0% 0% / 0.5);
   }
+
+  /* ===== AMOLED THEME ===== */
+  [data-theme="amoled"] {
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+
+    --card: 0 0% 5%;
+    --card-foreground: 0 0% 100%;
+
+    --popover: 0 0% 5%;
+    --popover-foreground: 0 0% 100%;
+
+    --primary: 199 89% 48%;
+    --primary-foreground: 0 0% 0%;
+
+    --secondary: 0 0% 8%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 0 0% 5%;
+    --muted-foreground: 0 0% 40%;
+
+    --accent: 0 0% 5%;
+    --accent-foreground: 0 0% 40%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 100% / 0.06;
+    --input: 0 0% 5%;
+    --ring: 199 89% 48%;
+
+    /* Glass tokens - amoled */
+    --glass-bg: 0 0% 100% / 0.04;
+    --glass-border: 0 0% 100% / 0.06;
+    --glass-glow: 199 89% 48% / 0.04;
+    --glass-blur: 24px;
+
+    /* Chat tokens */
+    --chat-user-bubble: 224 76% 48%;
+    --chat-user-text: 0 0% 100%;
+    --chat-ai-bubble: 0 0% 7%;
+    --chat-ai-text: 0 0% 100%;
+
+    /* Sidebar */
+    --sidebar-background: 0 0% 0%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 199 89% 48%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 0 0% 5%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 0% 100% / 0.06;
+    --sidebar-ring: 199 89% 48%;
+    --sidebar: 0 0% 3%;
+
+    --chart-1: 199 95% 73%;
+    --chart-2: 211 96% 78%;
+    --chart-3: 0 0% 40%;
+    --chart-4: 0 0% 30%;
+    --chart-5: 0 0% 20%;
+
+    /* No shadows on AMOLED */
+    --shadow-2xs: none;
+    --shadow-xs: none;
+    --shadow-sm: none;
+    --shadow: none;
+    --shadow-md: none;
+    --shadow-lg: none;
+    --shadow-xl: none;
+    --shadow-2xl: none;
+  }
 }
 
 @layer base {
   * {
     @apply border-border;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
   }
 
   body {
@@ -206,6 +285,11 @@
       inset 0 1px 0 0 hsl(0 0% 100% / 0.08);
   }
 
+  [data-theme="amoled"] .glass-panel,
+  [data-theme="amoled"] .glass-panel-strong {
+    box-shadow: none;
+  }
+
   .glass-input {
     background: hsl(var(--glass-bg));
     backdrop-filter: blur(20px);
@@ -214,6 +298,10 @@
     box-shadow: 
       0 2px 12px -2px hsl(0 0% 0% / 0.06),
       inset 0 1px 0 0 hsl(0 0% 100% / 0.04);
+  }
+
+  [data-theme="amoled"] .glass-input {
+    box-shadow: none;
   }
 
   .glass-glow {

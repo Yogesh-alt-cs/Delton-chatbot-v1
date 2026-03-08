@@ -27,6 +27,15 @@
   </head>
 
   <body>
+    <script>
+      // Prevent theme flash: apply data-theme + class before React mounts
+      (function(){
+        var t=localStorage.getItem('delton-theme');
+        if(t!=='light'&&t!=='dark'&&t!=='amoled')t='dark';
+        document.documentElement.setAttribute('data-theme',t);
+        document.documentElement.classList.add(t==='light'?'light':'dark');
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

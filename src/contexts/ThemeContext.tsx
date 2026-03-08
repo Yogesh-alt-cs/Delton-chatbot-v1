@@ -1,11 +1,10 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 
-type Theme = 'light' | 'dark' | 'system';
+export type Theme = 'light' | 'dark' | 'amoled';
 
 interface ThemeContextType {
   theme: Theme;
   setTheme: (theme: Theme) => void;
-  resolvedTheme: 'light' | 'dark';
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -13,35 +12,20 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('delton-theme') as Theme) || 'system';
+      const stored = localStorage.getItem('delton-theme');
+      if (stored === 'light' || stored === 'dark' || stored === 'amoled') return stored;
+      // Migrate old 'system' to 'dark'
+      return 'dark';
     }
-    return 'system';
+    return 'dark';
   });
-
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
     const root = window.document.documentElement;
-
-    const applyTheme = (newTheme: 'light' | 'dark') => {
-      root.classList.remove('light', 'dark');
-      root.classList.add(newTheme);
-      setResolvedTheme(newTheme);
-    };
-
-    if (theme === 'system') {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      applyTheme(mediaQuery.matches ? 'dark' : 'light');
-
-      const handler = (e: MediaQueryListEvent) => {
-        applyTheme(e.matches ? 'dark' : 'light');
-      };
-
-      mediaQuery.addEventListener('change', handler);
-      return () => mediaQuery.removeEventListener('change', handler);
-    } else {
-      applyTheme(theme);
-    }
+    root.setAttribute('data-theme', theme);
+    // Also set class for dark-mode aware components (dark applies to both dark & amoled)
+    root.classList.remove('light', 'dark');
+    root.classList.add(theme === 'light' ? 'light' : 'dark');
   }, [theme]);
 
   const setTheme = (newTheme: Theme) => {
@@ -50,7 +34,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, resolvedTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme }}>
       {children}
     </ThemeContext.Provider>
   );
