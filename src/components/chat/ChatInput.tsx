@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, KeyboardEvent } from 'react';
-import { Send, Plus, X, Mic, MicOff, RotateCcw, Check, Loader2 } from 'lucide-react';
+import { Send, Plus, X, Mic, MicOff, RotateCcw, Check, Loader2, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,6 +15,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+
+interface DocumentAttachment {
+  file: File;
+  name: string;
+  type: string;
+}
 
 function CameraDialog({ isOpen, onClose, onCapture }: {
   isOpen: boolean;
@@ -98,7 +104,7 @@ function CameraDialog({ isOpen, onClose, onCapture }: {
 }
 
 interface ChatInputProps {
-  onSend: (message: string, images?: MessageImage[]) => void;
+  onSend: (message: string, images?: MessageImage[], document?: DocumentAttachment) => void;
   disabled?: boolean;
   onMicStateChange?: (isActive: boolean) => void;
 }
@@ -108,11 +114,14 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
   const [interimText, setInterimText] = useState('');
   const [language, setLanguage] = useState('en-US');
   const [images, setImages] = useState<MessageImage[]>([]);
+  const [document, setDocument] = useState<DocumentAttachment | null>(null);
   const [attachmentOpen, setAttachmentOpen] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [sendAnimating, setSendAnimating] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -137,11 +146,21 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
 
   const handleSend = () => {
     const trimmed = message.trim();
-    if ((!trimmed && images.length === 0) || disabled) return;
-    onSend(trimmed || 'What do you see in this image?', images.length > 0 ? images : undefined);
+    if ((!trimmed && images.length === 0 && !document) || disabled) return;
+
+    // Trigger send button animation
+    setSendAnimating(true);
+    setTimeout(() => setSendAnimating(false), 400);
+
+    onSend(
+      trimmed || (document ? `Analyze this document: ${document.name}` : 'What do you see in this image?'),
+      images.length > 0 ? images : undefined,
+      document || undefined
+    );
     setMessage('');
     setInterimText('');
     setImages([]);
+    setDocument(null);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
   };
 
@@ -176,36 +195,28 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
     if (photoInputRef.current) photoInputRef.current.value = '';
   };
 
+  const handleDocFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) return;
+    setDocument({ file, name: file.name, type: file.type });
+    if (docInputRef.current) docInputRef.current.value = '';
+  };
+
   const displayText = interimText ? `${message} ${interimText}`.trim() : message;
-  const hasContent = message.trim() || images.length > 0;
+  const hasContent = message.trim() || images.length > 0 || !!document;
 
   return (
     <div>
       {/* Image previews */}
       <AnimatePresence>
         {images.length > 0 && (
-          <motion.div
-            className="flex gap-2 flex-wrap mb-3 px-2"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-          >
+          <motion.div className="flex gap-2 flex-wrap mb-3 px-2" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
             {images.map((image, index) => (
-              <motion.div
-                key={index}
-                className="relative w-14 h-14 rounded-2xl overflow-hidden glass-panel"
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0, opacity: 0 }}
-                transition={{ delay: index * 0.05 }}
-              >
+              <motion.div key={index} className="relative w-14 h-14 rounded-2xl overflow-hidden glass-panel" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} transition={{ delay: index * 0.05 }}>
                 <img src={image.url} alt={`Upload ${index + 1}`} className="w-full h-full object-cover" />
-                <motion.button
-                  onClick={() => setImages(images.filter((_, i) => i !== index))}
-                  className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-background/90 hover:bg-background text-foreground"
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                >
+                <motion.button onClick={() => setImages(images.filter((_, i) => i !== index))} className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-background/90 hover:bg-background text-foreground" whileTap={{ scale: 0.9 }}>
                   <X className="h-3 w-3" />
                 </motion.button>
               </motion.div>
@@ -214,7 +225,27 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
         )}
       </AnimatePresence>
 
-      {/* Liquid Glass Input Bar */}
+      {/* Document preview chip */}
+      <AnimatePresence>
+        {document && (
+          <motion.div
+            className="flex items-center gap-2 mb-3 px-2"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            <div className="flex items-center gap-2 bg-accent rounded-xl px-3 py-2 text-sm">
+              <FileText className="h-4 w-4 text-primary shrink-0" />
+              <span className="truncate max-w-[200px] text-foreground">{document.name}</span>
+              <button onClick={() => setDocument(null)} className="shrink-0 text-muted-foreground hover:text-foreground">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Input Bar */}
       <motion.div
         className={cn(
           "relative flex items-end gap-1.5 rounded-[28px] p-1.5 transition-all duration-300",
@@ -246,18 +277,13 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
             onClose={() => setAttachmentOpen(false)}
             onCameraOpen={() => setShowCamera(true)}
             onPhotoSelect={() => photoInputRef.current?.click()}
+            onDocumentSelect={() => docInputRef.current?.click()}
             disabled={disabled}
           />
         </div>
 
-        <input
-          ref={photoInputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          multiple
-          onChange={handlePhotoFiles}
-          className="hidden"
-        />
+        <input ref={photoInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple onChange={handlePhotoFiles} className="hidden" />
+        <input ref={docInputRef} type="file" accept=".pdf,.docx,.txt,.csv,.md" onChange={handleDocFiles} className="hidden" />
 
         {/* Text input */}
         <Textarea
@@ -284,9 +310,7 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
               type="button"
               className={cn(
                 'relative flex items-center justify-center h-9 w-9 rounded-full transition-all',
-                isListening
-                  ? 'text-primary bg-primary/10'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                isListening ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
               )}
               onClick={toggleListening}
               disabled={disabled}
@@ -294,21 +318,13 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
             >
               <AnimatePresence mode="wait">
                 {isListening ? (
-                  <motion.div key="off" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
-                    <MicOff className="h-4 w-4" />
-                  </motion.div>
+                  <motion.div key="off" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}><MicOff className="h-4 w-4" /></motion.div>
                 ) : (
-                  <motion.div key="on" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
-                    <Mic className="h-4 w-4" />
-                  </motion.div>
+                  <motion.div key="on" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}><Mic className="h-4 w-4" /></motion.div>
                 )}
               </AnimatePresence>
               {isListening && (
-                <motion.span
-                  className="absolute inset-0 rounded-full border-2 border-primary/40"
-                  animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0, 0.6] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                />
+                <motion.span className="absolute inset-0 rounded-full border-2 border-primary/40" animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0, 0.6] }} transition={{ duration: 1.5, repeat: Infinity }} />
               )}
             </motion.button>
           )}
@@ -316,7 +332,7 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
           <motion.button
             type="button"
             className={cn(
-              'flex items-center justify-center h-9 w-9 rounded-full transition-all',
+              'flex items-center justify-center h-9 w-9 rounded-full transition-all send-btn-ripple',
               hasContent && !disabled
                 ? 'bg-primary text-primary-foreground shadow-md'
                 : 'bg-accent/50 text-muted-foreground'
@@ -324,7 +340,9 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
             disabled={!hasContent || disabled}
             onClick={handleSend}
             whileHover={hasContent && !disabled ? { scale: 1.08 } : {}}
-            whileTap={hasContent && !disabled ? { scale: 0.9 } : {}}
+            whileTap={hasContent && !disabled ? { scale: 0.85 } : {}}
+            animate={sendAnimating ? { rotate: [0, 15, -5, 0], scale: [1, 1.2, 0.95, 1] } : {}}
+            transition={sendAnimating ? { duration: 0.4, ease: 'easeOut' } : {}}
           >
             <Send className="h-4 w-4" />
           </motion.button>
@@ -334,12 +352,7 @@ export function ChatInput({ onSend, disabled, onMicStateChange }: ChatInputProps
       {/* Listening indicator */}
       <AnimatePresence>
         {isListening && (
-          <motion.div
-            className="flex items-center justify-center gap-1.5 mt-2"
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 5 }}
-          >
+          <motion.div className="flex items-center justify-center gap-1.5 mt-2" initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 5 }}>
             <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
             <span className="text-xs text-primary font-medium">Listening...</span>
           </motion.div>

@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, Image } from 'lucide-react';
+import { Camera, Image, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface AttachmentMenuProps {
@@ -7,12 +7,14 @@ interface AttachmentMenuProps {
   onClose: () => void;
   onCameraOpen: () => void;
   onPhotoSelect: () => void;
+  onDocumentSelect?: () => void;
   disabled?: boolean;
 }
 
 const menuItems = [
   { icon: Camera, label: 'Camera', action: 'camera' as const },
   { icon: Image, label: 'Photos & Files', action: 'photo' as const },
+  { icon: FileText, label: 'Upload Document', action: 'document' as const },
 ];
 
 export function AttachmentMenu({
@@ -20,12 +22,14 @@ export function AttachmentMenu({
   onClose,
   onCameraOpen,
   onPhotoSelect,
+  onDocumentSelect,
   disabled,
 }: AttachmentMenuProps) {
   const handleAction = (action: string) => {
     switch (action) {
       case 'camera': onCameraOpen(); break;
       case 'photo': onPhotoSelect(); break;
+      case 'document': onDocumentSelect?.(); break;
     }
     onClose();
   };
@@ -45,7 +49,7 @@ export function AttachmentMenu({
           <motion.div
             className={cn(
               'absolute bottom-full left-0 mb-2 z-50',
-              'glass-panel-strong rounded-2xl p-1.5 min-w-[180px]',
+              'glass-panel-strong rounded-2xl p-1.5 min-w-[200px]',
             )}
             initial={{ opacity: 0, y: 8, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}

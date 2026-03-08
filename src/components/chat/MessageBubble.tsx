@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
 import { Bot, User } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { MessageActions } from './MessageActions';
 import { Feedback, MessageImage } from '@/lib/types';
 
@@ -28,11 +29,14 @@ export function MessageBubble({
   const isAssistant = role === 'assistant';
 
   return (
-    <div
+    <motion.div
       className={cn(
         "group flex gap-3 px-4 py-4 transition-colors",
         isUser ? "justify-end" : "justify-start"
       )}
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
     >
       {isAssistant && (
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full glass-panel mt-0.5">
@@ -85,6 +89,6 @@ export function MessageBubble({
           <User className="h-4 w-4 text-primary-foreground" />
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
