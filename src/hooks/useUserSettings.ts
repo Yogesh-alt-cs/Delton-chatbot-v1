@@ -71,8 +71,11 @@ export function useUserSettings() {
       setSettings(prev => prev ? { ...prev, ...updates } : null);
       
       // Sync theme locally
-      if (updates.theme && (updates.theme === 'light' || updates.theme === 'dark' || updates.theme === 'system')) {
-        setTheme(updates.theme);
+      if (updates.theme) {
+        const t = updates.theme;
+        if (t === 'light' || t === 'dark' || t === 'amoled') {
+          setTheme(t as Theme);
+        }
       }
     } catch (error) {
       console.error('Error updating settings:', error);
