@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/contexts/ThemeContext';
+import { useTheme, type Theme } from '@/contexts/ThemeContext';
 
 export interface UserSettings {
   id: string;
@@ -41,8 +41,9 @@ export function useUserSettings() {
       if (data) {
         setSettings(data as UserSettings);
         // Sync theme from database
-        if (data.theme === 'light' || data.theme === 'dark' || data.theme === 'system') {
-          setTheme(data.theme);
+        const t = data.theme;
+        if (t === 'light' || t === 'dark' || t === 'amoled') {
+          setTheme(t as Theme);
         }
       }
     } catch (error) {
@@ -70,8 +71,11 @@ export function useUserSettings() {
       setSettings(prev => prev ? { ...prev, ...updates } : null);
       
       // Sync theme locally
-      if (updates.theme && (updates.theme === 'light' || updates.theme === 'dark' || updates.theme === 'system')) {
-        setTheme(updates.theme);
+      if (updates.theme) {
+        const t = updates.theme;
+        if (t === 'light' || t === 'dark' || t === 'amoled') {
+          setTheme(t as Theme);
+        }
       }
     } catch (error) {
       console.error('Error updating settings:', error);

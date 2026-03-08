@@ -1,4 +1,4 @@
-import { Moon, Sun, Monitor, LogOut, User, Bell, Download, FileText, FileJson, FileType, Volume2, Trash2, Sparkles, Globe, Shield, Type, Info, Star, MessageSquare, Sliders, Keyboard } from 'lucide-react';
+import { Moon, Sun, LogOut, User, Bell, Download, FileText, FileJson, FileType, Volume2, Trash2, Sparkles, Globe, Shield, Type, Info, Star, MessageSquare, Sliders, Keyboard, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import { useTheme, type Theme } from '@/contexts/ThemeContext';
 import { useToast } from '@/hooks/use-toast';
 import {
   DropdownMenu,
@@ -39,9 +40,9 @@ import {
 } from '@/components/ui/alert-dialog';
 
 const themeOptions = [
-  { value: 'light', label: 'Light', icon: Sun },
-  { value: 'dark', label: 'Dark', icon: Moon },
-  { value: 'system', label: 'System', icon: Monitor },
+  { value: 'light' as Theme, label: 'Light', emoji: '☀️', previewBg: '#F5F5F5', previewBubble: '#2563EB', previewAi: '#F0F0F0' },
+  { value: 'dark' as Theme, label: 'Dark', emoji: '🌙', previewBg: '#111118', previewBubble: '#2563EB', previewAi: '#1E1E2E' },
+  { value: 'amoled' as Theme, label: 'AMOLED', emoji: '⚫', previewBg: '#000000', previewBubble: '#1D4ED8', previewAi: '#111111' },
 ] as const;
 
 const styleOptions = [
@@ -125,7 +126,7 @@ function SettingsRow({ label, description, children }: {
 }
 
 export default function Settings() {
-  const { user, signOut } = useAuth();
+  const { theme: currentTheme, setTheme: setAppTheme } = useTheme();
   const { settings, updateSettings, clearAllHistory } = useUserSettings();
   const { profile } = useProfile();
   const { exportConversations } = useExportData();
@@ -139,13 +140,16 @@ export default function Settings() {
   const [highContrast, setHighContrast] = useState(false);
   const [fontSize, setFontSize] = useState('medium');
 
-  const currentTheme = settings?.theme || 'system';
+  const { user, signOut } = useAuth();
   const notificationsEnabled = settings?.notifications_enabled ?? true;
   const currentVoice = settings?.tts_voice_name || 'default';
   const currentStyle = settings?.personalization_style || 'balanced';
   const currentLanguage = settings?.voice_language || 'en-US';
 
-  const handleThemeChange = (theme: 'light' | 'dark' | 'system') => updateSettings({ theme });
+  const handleThemeChange = (theme: Theme) => {
+    setAppTheme(theme);
+    updateSettings({ theme });
+  };
 
   const handleNotificationsChange = async (enabled: boolean) => {
     if (enabled && notificationsSupported) {
@@ -308,19 +312,38 @@ export default function Settings() {
           {/* Appearance */}
           <SettingsCard icon={Sun} title="Appearance" description="Theme and display preferences">
             <div className="grid grid-cols-3 gap-2 mb-3">
-              {themeOptions.map(({ value, label, icon: Icon }) => (
+              {themeOptions.map(({ value, label, emoji, previewBg, previewBubble, previewAi }) => (
                 <button
                   key={value}
                   onClick={() => handleThemeChange(value)}
                   className={cn(
-                    "flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition-all",
+                    "relative flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition-all",
                     currentTheme === value
-                      ? "border-primary bg-primary/10"
-                      : "border-border/50 bg-accent hover:bg-accent/80"
+                      ? "border-primary ring-2 ring-primary/30"
+                      : "border-border/50 hover:border-border"
                   )}
                 >
-                  <Icon className={cn("h-5 w-5", currentTheme === value ? "text-primary" : "text-muted-foreground")} />
-                  <span className={cn("text-xs font-medium", currentTheme === value ? "text-primary" : "text-muted-foreground")}>{label}</span>
+                  {/* Mini preview */}
+                  <div
+                    className="w-full h-14 rounded-lg overflow-hidden flex flex-col gap-1 p-1.5"
+                    style={{ backgroundColor: previewBg }}
+                  >
+                    <div className="flex justify-end">
+                      <div className="h-2 w-8 rounded-full" style={{ backgroundColor: previewBubble }} />
+                    </div>
+                    <div className="flex justify-start">
+                      <div className="h-2 w-10 rounded-full" style={{ backgroundColor: previewAi }} />
+                    </div>
+                    <div className="flex justify-end">
+                      <div className="h-2 w-6 rounded-full" style={{ backgroundColor: previewBubble }} />
+                    </div>
+                  </div>
+                  <span className="text-xs font-medium text-foreground">{emoji} {label}</span>
+                  {currentTheme === value && (
+                    <div className="absolute top-1.5 right-1.5 h-4 w-4 rounded-full bg-primary flex items-center justify-center">
+                      <Check className="h-2.5 w-2.5 text-primary-foreground" />
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
