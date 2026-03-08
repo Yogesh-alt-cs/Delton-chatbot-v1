@@ -423,6 +423,31 @@ export default function Settings() {
             </div>
           </SettingsCard>
 
+          {/* Keyboard Shortcuts (desktop only) */}
+          <div className="hidden lg:block">
+            <SettingsCard icon={Keyboard} title="Keyboard Shortcuts" description="Quick actions for desktop">
+              <div className="space-y-1">
+                {[
+                  { keys: ['⌘', 'K'], label: 'Focus message input' },
+                  { keys: ['⌘', 'N'], label: 'New chat' },
+                  { keys: ['⌘', '⇧', 'H'], label: 'Toggle chat history sidebar' },
+                  { keys: ['Esc'], label: 'Close modal / sidebar' },
+                ].map((shortcut) => (
+                  <div key={shortcut.label} className="flex items-center justify-between py-2.5 border-b border-border/50 last:border-0">
+                    <span className="text-sm text-foreground">{shortcut.label}</span>
+                    <div className="flex items-center gap-1">
+                      {shortcut.keys.map((key) => (
+                        <kbd key={key} className="inline-flex h-6 min-w-[24px] items-center justify-center rounded-md bg-accent px-1.5 text-[11px] font-mono font-semibold text-muted-foreground border border-border/50">
+                          {key}
+                        </kbd>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </SettingsCard>
+          </div>
+
           {/* About */}
           <SettingsCard icon={Info} title="About Delton" description="App information">
             <div className="space-y-1">
