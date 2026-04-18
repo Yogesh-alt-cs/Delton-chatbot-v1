@@ -369,205 +369,235 @@ Format the document professionally with clear headings and bullet points where a
   return (
     <AppLayout>
       <div className="flex flex-col h-full">
-        <div className="flex items-center gap-3 p-4 border-b border-border">
-          <FileText className="h-6 w-6 text-primary" />
-          <div>
-            <h1 className="text-lg font-semibold">PRD Generator</h1>
-            <p className="text-xs text-muted-foreground">Create professional Product Requirements Documents</p>
+        {/* Header */}
+        <div className="brutal-border-b p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="brutal-border h-10 w-10 flex items-center justify-center">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div>
+              <span className="font-mono text-[10px] tracking-[0.3em] text-muted-foreground uppercase">
+                &gt; DOC_GENERATOR
+              </span>
+              <h1 className="font-display text-xl uppercase mt-0.5">PRD_FORGE</h1>
+            </div>
           </div>
+          <span className="font-mono text-[10px] tracking-widest text-muted-foreground uppercase hidden sm:block">
+            STATUS: READY
+          </span>
         </div>
 
         <ScrollArea className="flex-1 pb-20">
-          <div className="p-4 space-y-6">
+          <div className="p-4 space-y-6 max-w-3xl mx-auto">
             {!generatedPRD ? (
               <>
-                {/* Template Selection */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Quick Start Templates</CardTitle>
-                    <CardDescription>
-                      Select a template to pre-fill common sections
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 gap-3">
-                      {templates.map((template) => (
-                        <button
-                          key={template.id}
-                          onClick={() => applyTemplate(template)}
-                          className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all hover:border-primary hover:bg-primary/5 ${
-                            selectedTemplate === template.id
-                              ? 'border-primary bg-primary/10'
-                              : 'border-border'
-                          }`}
-                        >
-                          <div className={`p-2 rounded-full ${
-                            selectedTemplate === template.id
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-muted'
-                          }`}>
-                            {template.icon}
-                          </div>
-                          <span className="font-medium text-sm">{template.name}</span>
-                          <span className="text-xs text-muted-foreground text-center">
-                            {template.description}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                {/* Templates */}
+                <section className="brutal-border">
+                  <div className="brutal-border-b p-3">
+                    <span className="font-mono text-[10px] tracking-[0.3em] text-muted-foreground uppercase">
+                      &gt; QUICK_START_TEMPLATES
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 divide-x divide-foreground">
+                    {templates.map((template, idx) => (
+                      <button
+                        key={template.id}
+                        onClick={() => applyTemplate(template)}
+                        className={`flex flex-col items-start gap-2 p-4 text-left transition-none ${
+                          idx > 1 ? 'brutal-border-t' : ''
+                        } ${
+                          selectedTemplate === template.id
+                            ? 'bg-foreground text-background'
+                            : 'hover:bg-foreground hover:text-background'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {template.icon}
+                          <span className="font-display text-sm uppercase">{template.name}</span>
+                        </div>
+                        <span className="font-mono text-[10px] tracking-wider uppercase opacity-70">
+                          {template.description}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
 
                 {/* Form */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Product Information</CardTitle>
-                    <CardDescription>
-                      Fill in the details below to generate a comprehensive PRD
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="productName">Product Name *</Label>
+                <section className="brutal-border">
+                  <div className="brutal-border-b p-3">
+                    <span className="font-mono text-[10px] tracking-[0.3em] text-muted-foreground uppercase">
+                      &gt; PRODUCT_INFO // INPUT_DATA
+                    </span>
+                  </div>
+
+                  <div className="p-4 space-y-5">
+                    <div>
+                      <Label htmlFor="productName" className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground">
+                        &gt; PRODUCT_NAME *
+                      </Label>
                       <Input
                         id="productName"
-                        placeholder="e.g., TaskFlow Pro"
+                        placeholder="TASKFLOW_PRO"
                         value={formData.productName}
                         onChange={(e) => handleInputChange('productName', e.target.value)}
+                        className="brutal-border bg-background mt-2 font-mono uppercase tracking-wider text-sm"
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="productDescription">Product Description *</Label>
+                    <div>
+                      <Label htmlFor="productDescription" className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground">
+                        &gt; DESCRIPTION *
+                      </Label>
                       <Textarea
                         id="productDescription"
-                        placeholder="Briefly describe what your product does..."
+                        placeholder="Describe what your product does..."
                         value={formData.productDescription}
                         onChange={(e) => handleInputChange('productDescription', e.target.value)}
                         rows={3}
+                        className="brutal-border bg-background mt-2 font-sans text-sm"
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="targetAudience">Target Audience</Label>
+                    <div>
+                      <Label htmlFor="targetAudience" className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground">
+                        &gt; TARGET_AUDIENCE
+                      </Label>
                       <Input
                         id="targetAudience"
-                        placeholder="e.g., Small business owners, remote teams"
+                        placeholder="Small business owners, remote teams..."
                         value={formData.targetAudience}
                         onChange={(e) => handleInputChange('targetAudience', e.target.value)}
+                        className="brutal-border bg-background mt-2 font-sans text-sm"
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="problemStatement">Problem Statement</Label>
+                    <div>
+                      <Label htmlFor="problemStatement" className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground">
+                        &gt; PROBLEM_STATEMENT
+                      </Label>
                       <Textarea
                         id="problemStatement"
-                        placeholder="What problem does your product solve?"
+                        placeholder="What problem does this product solve?"
                         value={formData.problemStatement}
                         onChange={(e) => handleInputChange('problemStatement', e.target.value)}
                         rows={2}
+                        className="brutal-border bg-background mt-2 font-sans text-sm"
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="keyFeatures">Key Features</Label>
+                    <div>
+                      <Label htmlFor="keyFeatures" className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground">
+                        &gt; KEY_FEATURES
+                      </Label>
                       <Textarea
                         id="keyFeatures"
                         placeholder="List the main features (one per line)..."
                         value={formData.keyFeatures}
                         onChange={(e) => handleInputChange('keyFeatures', e.target.value)}
                         rows={3}
+                        className="brutal-border bg-background mt-2 font-mono text-xs"
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="successMetrics">Success Metrics</Label>
+                    <div>
+                      <Label htmlFor="successMetrics" className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground">
+                        &gt; SUCCESS_METRICS
+                      </Label>
                       <Input
                         id="successMetrics"
-                        placeholder="e.g., 10k DAU, 95% uptime, NPS > 50"
+                        placeholder="10K_DAU // 95%_UPTIME // NPS>50"
                         value={formData.successMetrics}
                         onChange={(e) => handleInputChange('successMetrics', e.target.value)}
+                        className="brutal-border bg-background mt-2 font-mono uppercase tracking-wider text-xs"
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="timeline">Timeline</Label>
+                    <div>
+                      <Label htmlFor="timeline" className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground">
+                        &gt; TIMELINE
+                      </Label>
                       <Select
                         value={formData.timeline}
                         onValueChange={(value) => handleInputChange('timeline', value)}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="brutal-border bg-background mt-2 font-mono uppercase tracking-wider text-xs">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1 month">1 Month</SelectItem>
-                          <SelectItem value="3 months">3 Months</SelectItem>
-                          <SelectItem value="6 months">6 Months</SelectItem>
-                          <SelectItem value="1 year">1 Year</SelectItem>
-                          <SelectItem value="18 months">18 Months</SelectItem>
+                        <SelectContent className="brutal-border bg-background font-mono uppercase tracking-wider">
+                          <SelectItem value="1 month">1_MONTH</SelectItem>
+                          <SelectItem value="3 months">3_MONTHS</SelectItem>
+                          <SelectItem value="6 months">6_MONTHS</SelectItem>
+                          <SelectItem value="1 year">1_YEAR</SelectItem>
+                          <SelectItem value="18 months">18_MONTHS</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="constraints">Constraints & Limitations</Label>
+                    <div>
+                      <Label htmlFor="constraints" className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground">
+                        &gt; CONSTRAINTS
+                      </Label>
                       <Textarea
                         id="constraints"
-                        placeholder="Budget, technical limitations, regulatory requirements..."
+                        placeholder="Budget, technical limits, regulations..."
                         value={formData.constraints}
                         onChange={(e) => handleInputChange('constraints', e.target.value)}
                         rows={2}
+                        className="brutal-border bg-background mt-2 font-sans text-sm"
                       />
                     </div>
 
                     <Button
                       onClick={generatePRD}
                       disabled={isGenerating}
-                      className="w-full"
-                      size="lg"
+                      className="btn-brutal w-full h-12 tracking-widest text-sm"
                     >
                       {isGenerating ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Generating PRD...
+                          GENERATING...
                         </>
                       ) : (
-                        <>
-                          <FileText className="h-4 w-4 mr-2" />
-                          Generate PRD
-                        </>
+                        '[ EXECUTE_GENERATE ]'
                       )}
                     </Button>
-                  </CardContent>
-                </Card>
+                  </div>
+                </section>
               </>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold">Generated PRD</h2>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={copyToClipboard} title="Copy">
-                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                <div className="brutal-border-b pb-3 flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <span className="font-mono text-[10px] tracking-[0.3em] text-muted-foreground uppercase">
+                      &gt; OUTPUT_DOCUMENT
+                    </span>
+                    <h2 className="font-display text-2xl uppercase mt-1">GENERATED_PRD</h2>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button variant="ghost" size="sm" onClick={copyToClipboard} className="brutal-border font-mono text-xs uppercase tracking-widest">
+                      {copied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
+                      COPY
                     </Button>
-                    <Button variant="outline" size="sm" onClick={downloadMarkdown} title="Download Markdown">
-                      <Download className="h-4 w-4" />
+                    <Button variant="ghost" size="sm" onClick={downloadMarkdown} className="brutal-border font-mono text-xs uppercase tracking-widest">
+                      <Download className="h-4 w-4 mr-1" />
+                      MD
                     </Button>
-                    <Button variant="outline" size="sm" onClick={downloadPDF} title="Download PDF">
-                      <FileDown className="h-4 w-4" />
+                    <Button variant="ghost" size="sm" onClick={downloadPDF} className="brutal-border font-mono text-xs uppercase tracking-widest">
+                      <FileDown className="h-4 w-4 mr-1" />
+                      PDF
                     </Button>
-                    <Button variant="outline" size="sm" onClick={resetForm}>
-                      New PRD
+                    <Button variant="ghost" size="sm" onClick={resetForm} className="brutal-border font-mono text-xs uppercase tracking-widest">
+                      NEW
                     </Button>
                   </div>
                 </div>
 
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
-                      {generatedPRD}
-                    </div>
-                  </CardContent>
-                </Card>
+                <section className="brutal-border p-5 bg-background">
+                  <div className="font-sans text-sm whitespace-pre-wrap leading-relaxed">
+                    {generatedPRD}
+                  </div>
+                </section>
               </div>
             )}
           </div>
@@ -576,3 +606,4 @@ Format the document professionally with clear headings and bullet points where a
     </AppLayout>
   );
 }
+
