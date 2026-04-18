@@ -334,9 +334,8 @@ export function ChatInput({ onSend, disabled, isLoading, onStop, onMicStateChang
       {/* Input Bar */}
       <motion.div
         className={cn(
-          "relative flex items-end gap-1.5 rounded-[28px] p-1.5 transition-all duration-300",
-          "glass-panel-strong",
-          isFocused && "glass-glow"
+          "relative flex items-end gap-1.5 p-1.5 transition-colors duration-150 bg-background brutal-border",
+          isFocused && "ring-1 ring-foreground"
         )}
         layout
       >
@@ -439,31 +438,29 @@ export function ChatInput({ onSend, disabled, isLoading, onStop, onMicStateChang
           {isLoading ? (
             <motion.button
               type="button"
-              className="flex items-center justify-center h-10 w-10 rounded-full bg-destructive text-destructive-foreground shadow-md"
+              className="flex items-center justify-center h-10 px-3 bg-destructive text-destructive-foreground font-mono text-[10px] tracking-widest uppercase brutal-border"
               onClick={onStop}
-              whileHover={{ scale: 1.08 }}
-              whileTap={{ scale: 0.85 }}
+              whileTap={{ scale: 0.95 }}
               title="Stop generation"
             >
-              <Square className="h-4 w-4 fill-current" />
+              <Square className="h-3 w-3 fill-current mr-1.5" />
+              STOP
             </motion.button>
           ) : (
             <motion.button
               type="button"
               className={cn(
-                'relative flex items-center justify-center h-10 w-10 rounded-full transition-all overflow-hidden',
+                'flex items-center justify-center h-10 px-3 font-mono text-[10px] tracking-widest uppercase border transition-colors',
                 hasContent && !disabled
-                  ? 'bg-primary text-primary-foreground shadow-md'
-                  : 'bg-accent/50 text-muted-foreground'
+                  ? 'bg-foreground text-background border-foreground hover:bg-background hover:text-foreground'
+                  : 'bg-background text-muted-foreground border-muted-foreground/30 cursor-not-allowed'
               )}
               disabled={!hasContent || disabled}
               onClick={handleSend}
-              whileHover={hasContent && !disabled ? { scale: 1.08 } : {}}
-              whileTap={hasContent && !disabled ? { scale: 0.85 } : {}}
-              animate={sendAnimating ? { rotate: [0, 15, -5, 0], scale: [1, 1.2, 0.95, 1] } : {}}
-              transition={sendAnimating ? { duration: 0.4, ease: 'easeOut' } : {}}
+              whileTap={hasContent && !disabled ? { scale: 0.95 } : {}}
             >
-              <Send className="h-4 w-4" />
+              TRANSMIT
+              <Send className="h-3 w-3 ml-1.5" />
             </motion.button>
           )}
         </div>
@@ -493,8 +490,8 @@ export function ChatInput({ onSend, disabled, isLoading, onStop, onMicStateChang
         )}
       </AnimatePresence>
 
-      <p className="text-center text-[10px] text-muted-foreground/30 mt-2">
-        Delton can make mistakes. Consider checking important information.
+      <p className="text-center text-[9px] font-mono tracking-widest text-muted-foreground mt-2 uppercase">
+        ENCRYPTED_CONNECTION // VER:2.0.0_STABLE
       </p>
 
       <CameraDialog

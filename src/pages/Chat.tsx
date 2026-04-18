@@ -158,41 +158,46 @@ export default function Chat() {
         </AnimatePresence>
 
         {/* Header */}
-        <header className="flex h-14 items-center justify-between px-3 sm:px-4 glass-panel-strong safe-top shrink-0 z-10 border-b border-border/30">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="h-10 w-10 lg:hidden" onClick={() => setSidebarOpen(true)}>
+        <header className="flex h-14 items-center justify-between px-3 sm:px-4 bg-background safe-top shrink-0 z-10 brutal-border-b">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" className="h-10 w-10 lg:hidden hover:bg-foreground hover:text-background rounded-none" onClick={() => setSidebarOpen(true)}>
               <Menu className="h-5 w-5" />
             </Button>
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10">
-                <MessageCircle className="h-4 w-4 text-primary" />
-              </div>
-              <span className="font-semibold text-sm hidden sm:inline">Delton AI</span>
+              <div className="h-2 w-2 bg-foreground" />
+              <span className="font-display text-base hidden sm:inline">DELTON_CORE</span>
+              <span className="font-mono text-[10px] tracking-widest text-muted-foreground hidden md:inline">// STATUS:STABLE</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-1 rounded-full glass-input p-1">
-            <Button variant={mode === 'text' ? 'secondary' : 'ghost'} size="sm" onClick={() => setMode('text')} className="h-8 gap-1.5 px-3 rounded-full text-xs">
-              <MessageCircle className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Text</span>
+          <div className="flex items-stretch brutal-border">
+            <Button variant="ghost" size="sm" onClick={() => setMode('text')} className={cn(
+              "h-8 gap-1.5 px-3 text-[10px] font-mono tracking-widest uppercase rounded-none border-0",
+              mode === 'text' ? "bg-foreground text-background hover:bg-foreground hover:text-background" : "bg-background hover:bg-foreground hover:text-background"
+            )}>
+              <MessageCircle className="h-3 w-3" />
+              <span className="hidden sm:inline">PROMPT</span>
             </Button>
-            <Button variant={mode === 'voice' ? 'secondary' : 'ghost'} size="sm" onClick={() => setMode('voice')} className="h-8 gap-1.5 px-3 rounded-full text-xs">
-              <Phone className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Voice</span>
+            <Button variant="ghost" size="sm" onClick={() => setMode('voice')} className={cn(
+              "h-8 gap-1.5 px-3 text-[10px] font-mono tracking-widest uppercase rounded-none border-0 brutal-border-l",
+              mode === 'voice' ? "bg-foreground text-background hover:bg-foreground hover:text-background" : "bg-background hover:bg-foreground hover:text-background"
+            )}>
+              <Phone className="h-3 w-3" />
+              <span className="hidden sm:inline">AUDIO</span>
             </Button>
           </div>
 
           <div className="flex items-center gap-1">
             {conversationId && (
-              <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => exportSingleConversation(conversationId, 'pdf')} title="Download as PDF">
-                <Download className="h-5 w-5" />
+              <Button variant="ghost" size="icon" className="h-10 w-10 hover:bg-foreground hover:text-background rounded-none" onClick={() => exportSingleConversation(conversationId, 'pdf')} title="Download as PDF">
+                <Download className="h-4 w-4" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" className="h-10 w-10 hidden lg:flex" onClick={() => navigate('/settings')} title="Settings">
-              <Settings className="h-5 w-5" />
+            <Button variant="ghost" size="icon" className="h-10 w-10 hidden lg:flex hover:bg-foreground hover:text-background rounded-none" onClick={() => navigate('/settings')} title="Settings">
+              <Settings className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-10 w-10" onClick={handleNewChat}>
-              <Plus className="h-5 w-5" />
+            <Button variant="ghost" size="icon" className="h-10 w-10 hover:bg-foreground hover:text-background rounded-none" onClick={handleNewChat}>
+              <Plus className="h-4 w-4" />
             </Button>
           </div>
         </header>
@@ -210,14 +215,17 @@ export default function Chat() {
           </div>
         ) : (
           <>
-            <div ref={scrollContainerRef} className="relative flex-1 overflow-y-auto" onScroll={handleScroll}>
+            <div ref={scrollContainerRef} className="relative flex-1 overflow-y-auto bg-background" onScroll={handleScroll}>
               {messages.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center p-4 sm:p-8 text-center">
-                  <div className="glass-panel rounded-3xl p-6 sm:p-8 max-w-md w-full">
-                    <h2 className="mb-2 text-xl sm:text-2xl font-semibold">What can I help with?</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Ask me anything — questions, analysis, creative writing, and more.
-                    </p>
+                  <div className="brutal-border bg-background p-6 sm:p-8 max-w-md w-full text-left">
+                    <div className="font-mono text-[10px] tracking-widest text-muted-foreground mb-3">SYSTEM &gt; READY</div>
+                    <h2 className="mb-3 font-display text-3xl sm:text-4xl leading-none">SYSTEM<br/>READY.</h2>
+                    <div className="brutal-border-t pt-3 mt-3">
+                      <p className="font-mono text-[11px] tracking-wider text-muted-foreground uppercase leading-relaxed">
+                        CORE_AI_INITIALIZED. STANDBY_FOR_INPUT. ANALYSIS, WRITING, AND SYNTHESIS_PROTOCOL_ACTIVE.
+                      </p>
+                    </div>
                   </div>
                 </div>
               ) : (
