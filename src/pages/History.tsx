@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MessageSquare, Trash2, ChevronRight, Share2, Archive, ArchiveRestore, Clock, Timer, FileType, MessageCircle, RefreshCw, Loader2 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Search, MessageSquare, Trash2, ChevronRight, Share2, Archive, ArchiveRestore, Timer, FileType, MessageCircle, RefreshCw, Loader2, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useConversations } from '@/hooks/useConversations';
@@ -10,7 +9,6 @@ import { useExportData } from '@/hooks/useExportData';
 import { useToast } from '@/hooks/use-toast';
 import { groupConversationsByDate, formatConversationDate } from '@/lib/dateUtils';
 import { Conversation } from '@/lib/types';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import {
   AlertDialog,
@@ -37,14 +35,14 @@ import {
 
 export default function History() {
   const navigate = useNavigate();
-  const { 
-    conversations, 
-    archivedConversations, 
+  const {
+    conversations,
+    archivedConversations,
     isLoading,
     deletingIds,
     error,
     loadConversations,
-    searchConversations, 
+    searchConversations,
     deleteConversation,
     archiveConversation,
     unarchiveConversation,
@@ -58,7 +56,7 @@ export default function History() {
   const [isSearching, setIsSearching] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [activeTab, setActiveTab] = useState('active');
+  const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
@@ -66,21 +64,19 @@ export default function History() {
       setSearchResults(null);
       return;
     }
-
     const timer = setTimeout(async () => {
       setIsSearching(true);
       const results = await searchConversations(searchQuery);
       setSearchResults(results);
       setIsSearching(false);
     }, 300);
-
     return () => clearTimeout(timer);
   }, [searchQuery, searchConversations]);
 
-  const displayConversations = activeTab === 'active' 
+  const displayConversations = activeTab === 'active'
     ? (searchResults ?? conversations)
     : archivedConversations;
-    
+
   const groupedConversations = useMemo(
     () => groupConversationsByDate(displayConversations),
     [displayConversations]
@@ -90,89 +86,53 @@ export default function History() {
     setIsRefreshing(true);
     await loadConversations();
     setIsRefreshing(false);
-    toast({ title: 'History refreshed' });
+    toast({ title: 'HISTORY_REFRESHED' });
   };
 
   const handleDelete = async () => {
     if (!deleteId || isDeleting) return;
-    
     setIsDeleting(true);
     const success = await deleteConversation(deleteId);
-    
     if (success) {
-      toast({ title: 'Conversation deleted' });
+      toast({ title: 'CONVERSATION_DELETED' });
       if (searchResults) {
         setSearchResults(prev => prev?.filter(c => c.id !== deleteId) ?? null);
       }
     } else {
-      toast({ 
-        title: 'Error', 
-        description: 'Failed to delete conversation. Please try again.',
-        variant: 'destructive' 
-      });
+      toast({ title: 'ERROR', description: 'Failed to delete conversation.', variant: 'destructive' });
     }
-    
     setIsDeleting(false);
     setDeleteId(null);
   };
 
-  const handleChatAgain = (conv: Conversation) => {
-    // Navigate to the existing conversation to continue chatting
-    navigate(`/chat/${conv.id}`);
-  };
-
   const handleArchive = async (id: string) => {
     const success = await archiveConversation(id);
-    if (success) {
-      toast({ title: 'Conversation archived' });
-      if (searchResults) {
-        setSearchResults(prev => prev?.filter(c => c.id !== id) ?? null);
-      }
-    } else {
-      toast({ 
-        title: 'Error', 
-        description: 'Failed to archive conversation',
-        variant: 'destructive' 
-      });
-    }
+    if (success) toast({ title: 'CONVERSATION_ARCHIVED' });
+    else toast({ title: 'ERROR', description: 'Failed to archive', variant: 'destructive' });
   };
 
   const handleUnarchive = async (id: string) => {
     const success = await unarchiveConversation(id);
-    if (success) {
-      toast({ title: 'Conversation restored' });
-    } else {
-      toast({ 
-        title: 'Error', 
-        description: 'Failed to restore conversation',
-        variant: 'destructive' 
-      });
-    }
+    if (success) toast({ title: 'CONVERSATION_RESTORED' });
+    else toast({ title: 'ERROR', description: 'Failed to restore', variant: 'destructive' });
   };
 
   const handleSetExpiry = async (id: string, hours: number | null) => {
     const expiresAt = hours ? new Date(Date.now() + hours * 60 * 60 * 1000) : null;
     const success = await setConversationExpiry(id, expiresAt);
     if (success) {
-      toast({ 
-        title: hours ? `Messages will disappear in ${hours}h` : 'Disappearing messages disabled' 
-      });
+      toast({ title: hours ? `EXPIRES_IN_${hours}H` : 'EXPIRY_DISABLED' });
     } else {
-      toast({ 
-        title: 'Error', 
-        description: 'Failed to set message expiry',
-        variant: 'destructive' 
-      });
+      toast({ title: 'ERROR', description: 'Failed to set expiry', variant: 'destructive' });
     }
   };
 
   const renderConversationItem = (conv: Conversation, isArchived: boolean) => {
     const isBeingDeleted = deletingIds.has(conv.id);
-    
     return (
       <div
         key={conv.id}
-        className={`flex items-center gap-2 px-4 py-3 transition-all hover:bg-muted/50 ${
+        className={`flex items-center gap-2 px-4 py-3 brutal-border-b hover:bg-foreground hover:text-background transition-none group/item ${
           isBeingDeleted ? 'opacity-50 pointer-events-none' : ''
         }`}
       >
@@ -181,116 +141,111 @@ export default function History() {
           onClick={() => navigate(`/chat/${conv.id}`)}
           disabled={isBeingDeleted}
         >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-            <MessageSquare className="h-5 w-5 text-primary" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center brutal-border">
+            <MessageSquare className="h-4 w-4" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="truncate font-medium">{conv.title}</p>
+            <p className="truncate font-mono text-sm uppercase tracking-wider">
+              {conv.title.replace(/\s+/g, '_').toUpperCase()}
+            </p>
             <div className="flex items-center gap-2">
-              <p className="text-xs text-muted-foreground">
-                {formatConversationDate(conv.updated_at)}
+              <p className="font-mono text-[10px] tracking-widest text-muted-foreground uppercase group-hover/item:text-background/70">
+                {formatConversationDate(conv.updated_at).toUpperCase()}
               </p>
               {conv.expires_at && (
-                <span className="flex items-center gap-1 text-xs text-orange-500">
+                <span className="flex items-center gap-1 font-mono text-[10px] tracking-widest uppercase">
                   <Timer className="h-3 w-3" />
-                  Expires
+                  EXPIRES
                 </span>
               )}
             </div>
           </div>
-          <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+          <ChevronRight className="h-4 w-4 shrink-0" />
         </button>
-        
+
         <TooltipProvider delayDuration={300}>
-          {/* Chat Again Button */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 shrink-0 text-muted-foreground hover:text-primary"
-                onClick={() => handleChatAgain(conv)}
+                className="h-9 w-9 shrink-0 hover:bg-background hover:text-foreground"
+                onClick={() => navigate(`/chat/${conv.id}`)}
                 disabled={isBeingDeleted}
               >
                 <MessageCircle className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Continue this chat</TooltipContent>
+            <TooltipContent className="brutal-border bg-background font-mono text-[10px] tracking-widest uppercase">
+              CONTINUE
+            </TooltipContent>
           </Tooltip>
-          
+
           {!isArchived && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 shrink-0 text-muted-foreground hover:text-primary"
+                  className="h-9 w-9 shrink-0 hover:bg-background hover:text-foreground"
                   disabled={isBeingDeleted}
                 >
                   <Clock className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-background border border-border z-50">
-                <DropdownMenuItem onClick={() => handleSetExpiry(conv.id, 1)}>
-                  Disappear in 1 hour
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleSetExpiry(conv.id, 24)}>
-                  Disappear in 24 hours
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleSetExpiry(conv.id, 168)}>
-                  Disappear in 7 days
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleSetExpiry(conv.id, null)}>
-                  Don't disappear
-                </DropdownMenuItem>
+              <DropdownMenuContent align="end" className="brutal-border bg-background font-mono text-xs uppercase tracking-wider z-50">
+                <DropdownMenuItem onClick={() => handleSetExpiry(conv.id, 1)}>EXPIRE_1H</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSetExpiry(conv.id, 24)}>EXPIRE_24H</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSetExpiry(conv.id, 168)}>EXPIRE_7D</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSetExpiry(conv.id, null)}>NEVER</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          
+
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 shrink-0 text-muted-foreground hover:text-primary"
+                className="h-9 w-9 shrink-0 hover:bg-background hover:text-foreground"
                 onClick={() => exportSingleConversation(conv.id, 'pdf')}
                 disabled={isBeingDeleted}
               >
                 <FileType className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Export as PDF</TooltipContent>
+            <TooltipContent className="brutal-border bg-background font-mono text-[10px] tracking-widest uppercase">EXPORT_PDF</TooltipContent>
           </Tooltip>
-          
+
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 shrink-0 text-muted-foreground hover:text-primary"
+                className="h-9 w-9 shrink-0 hover:bg-background hover:text-foreground"
                 onClick={() => shareConversation(conv.id, conv.title)}
                 disabled={isBeingDeleted}
               >
                 <Share2 className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Share</TooltipContent>
+            <TooltipContent className="brutal-border bg-background font-mono text-[10px] tracking-widest uppercase">SHARE</TooltipContent>
           </Tooltip>
-          
+
           {isArchived ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 shrink-0 text-muted-foreground hover:text-primary"
+                  className="h-9 w-9 shrink-0 hover:bg-background hover:text-foreground"
                   onClick={() => handleUnarchive(conv.id)}
                   disabled={isBeingDeleted}
                 >
                   <ArchiveRestore className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Restore</TooltipContent>
+              <TooltipContent className="brutal-border bg-background font-mono text-[10px] tracking-widest uppercase">RESTORE</TooltipContent>
             </Tooltip>
           ) : (
             <Tooltip>
@@ -298,34 +253,30 @@ export default function History() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 shrink-0 text-muted-foreground hover:text-primary"
+                  className="h-9 w-9 shrink-0 hover:bg-background hover:text-foreground"
                   onClick={() => handleArchive(conv.id)}
                   disabled={isBeingDeleted}
                 >
                   <Archive className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Archive</TooltipContent>
+              <TooltipContent className="brutal-border bg-background font-mono text-[10px] tracking-widest uppercase">ARCHIVE</TooltipContent>
             </Tooltip>
           )}
-          
+
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                className="h-9 w-9 shrink-0 text-destructive hover:bg-destructive hover:text-destructive-foreground"
                 onClick={() => setDeleteId(conv.id)}
                 disabled={isBeingDeleted}
               >
-                {isBeingDeleted ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="h-4 w-4" />
-                )}
+                {isBeingDeleted ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Delete</TooltipContent>
+            <TooltipContent className="brutal-border bg-background font-mono text-[10px] tracking-widest uppercase">DELETE</TooltipContent>
           </Tooltip>
         </TooltipProvider>
       </div>
@@ -336,49 +287,68 @@ export default function History() {
     <AppLayout>
       <div className="flex h-[calc(100vh-4rem)] flex-col">
         {/* Header */}
-        <header className="border-b border-border p-4 safe-top">
+        <header className="brutal-border-b p-4 safe-top">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl font-bold">History</h1>
+            <div>
+              <span className="font-mono text-[10px] tracking-[0.3em] text-muted-foreground uppercase">
+                &gt; SYSTEM_LOG
+              </span>
+              <h1 className="font-display text-2xl mt-1">HISTORY</h1>
+            </div>
             <Button
               variant="ghost"
               size="icon"
               onClick={handleRefresh}
               disabled={isRefreshing || isLoading}
-              className="h-9 w-9"
+              className="h-9 w-9 brutal-border hover:bg-foreground hover:text-background"
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </Button>
           </div>
-          
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search conversations..."
-              className="h-10 rounded-xl pl-10"
+
+          {/* Search */}
+          <div className="relative mb-4 brutal-border">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+            <input
+              placeholder="QUERY..."
+              className="h-11 w-full bg-background pl-10 pr-10 font-mono text-xs tracking-widest uppercase outline-none placeholder:text-muted-foreground"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
             {isSearching && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               </div>
             )}
           </div>
-          
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="active">Active ({conversations.length})</TabsTrigger>
-              <TabsTrigger value="archived">Archived ({archivedConversations.length})</TabsTrigger>
-            </TabsList>
-          </Tabs>
+
+          {/* Tabs — brutal */}
+          <div className="grid grid-cols-2 brutal-border">
+            <button
+              onClick={() => setActiveTab('active')}
+              className={`p-3 font-mono text-xs tracking-widest uppercase brutal-border-r ${
+                activeTab === 'active' ? 'bg-foreground text-background' : 'hover:bg-foreground/10'
+              }`}
+            >
+              ACTIVE [{conversations.length}]
+            </button>
+            <button
+              onClick={() => setActiveTab('archived')}
+              className={`p-3 font-mono text-xs tracking-widest uppercase ${
+                activeTab === 'archived' ? 'bg-foreground text-background' : 'hover:bg-foreground/10'
+              }`}
+            >
+              ARCHIVED [{archivedConversations.length}]
+            </button>
+          </div>
         </header>
 
-        {/* Error Banner */}
+        {/* Error */}
         {error && (
-          <div className="mx-4 mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm flex items-center justify-between">
-            <span>{error}</span>
-            <Button variant="ghost" size="sm" onClick={handleRefresh}>
-              Retry
+          <div className="mx-4 mt-4 p-3 brutal-border border-destructive font-mono text-xs tracking-wider text-destructive uppercase flex items-center justify-between">
+            <span>! {error}</span>
+            <Button variant="ghost" size="sm" onClick={handleRefresh} className="font-mono text-xs uppercase">
+              RETRY
             </Button>
           </div>
         )}
@@ -387,49 +357,40 @@ export default function History() {
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
             <div className="flex h-full items-center justify-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+              <span className="font-mono text-xs tracking-widest text-muted-foreground uppercase animate-pulse">
+                &gt; LOADING_LOGS...
+              </span>
             </div>
           ) : groupedConversations.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
-                {activeTab === 'archived' ? (
-                  <Archive className="h-8 w-8 text-muted-foreground" />
-                ) : (
-                  <MessageSquare className="h-8 w-8 text-muted-foreground" />
-                )}
+              <div className="mb-4 flex h-16 w-16 items-center justify-center brutal-border">
+                {activeTab === 'archived' ? <Archive className="h-7 w-7" /> : <MessageSquare className="h-7 w-7" />}
               </div>
-              <h2 className="mb-2 text-lg font-semibold">
-                {searchQuery ? 'No results found' : activeTab === 'archived' ? 'No archived conversations' : 'No conversations yet'}
+              <h2 className="mb-2 font-display text-xl uppercase">
+                {searchQuery ? 'NO_RESULTS' : activeTab === 'archived' ? 'EMPTY_ARCHIVE' : 'NO_HISTORY'}
               </h2>
-              <p className="max-w-xs text-sm text-muted-foreground">
-                {searchQuery 
-                  ? 'Try a different search term'
-                  : activeTab === 'archived' 
-                    ? 'Archived conversations will appear here'
-                    : 'Your chat history will appear here once you start a conversation'
-                }
+              <p className="max-w-xs font-mono text-xs tracking-wider text-muted-foreground uppercase">
+                {searchQuery ? '> Try a different query' : '> Start a conversation to populate logs'}
               </p>
               {!searchQuery && activeTab === 'active' && (
-                <Button 
-                  className="mt-4" 
+                <Button
+                  className="btn-brutal mt-6 tracking-widest text-xs"
                   onClick={() => navigate('/chat')}
                 >
-                  Start a conversation
+                  [ NEW_CHAT ]
                 </Button>
               )}
             </div>
           ) : (
             <div className="pb-4">
-
-
               {groupedConversations.map((group) => (
                 <div key={group.label}>
-                  <div className="sticky top-0 z-10 bg-background/95 px-4 py-2 backdrop-blur">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      {group.label}
+                  <div className="sticky top-0 z-10 bg-background brutal-border-b px-4 py-2">
+                    <h3 className="font-mono text-[10px] tracking-[0.3em] uppercase text-muted-foreground">
+                      &gt; {group.label}
                     </h3>
                   </div>
-                  <div className="divide-y divide-border">
+                  <div>
                     {group.conversations.map((conv) => renderConversationItem(conv, activeTab === 'archived'))}
                   </div>
                 </div>
@@ -438,31 +399,25 @@ export default function History() {
           )}
         </div>
 
-        {/* Delete Confirmation Dialog */}
+        {/* Delete dialog */}
         <AlertDialog open={!!deleteId} onOpenChange={() => !isDeleting && setDeleteId(null)}>
-          <AlertDialogContent className="bg-background border border-border">
+          <AlertDialogContent className="brutal-border bg-background">
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete conversation?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the
-                conversation and all its messages.
+              <AlertDialogTitle className="font-display text-2xl uppercase">DELETE_CONVERSATION?</AlertDialogTitle>
+              <AlertDialogDescription className="font-mono text-xs tracking-wider uppercase text-muted-foreground">
+                &gt; This action is irreversible. All messages will be permanently destroyed.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={isDeleting} className="font-mono text-xs uppercase tracking-widest brutal-border">
+                CANCEL
+              </AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 font-mono text-xs uppercase tracking-widest brutal-border"
               >
-                {isDeleting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Deleting...
-                  </>
-                ) : (
-                  'Delete'
-                )}
+                {isDeleting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />DELETING</> : 'CONFIRM_DELETE'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
