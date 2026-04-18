@@ -249,6 +249,66 @@
   .delay-2 { animation-delay: 0.2s; }
   .delay-3 { animation-delay: 0.3s; }
 
+  /* CRT scanline overlay — global terminal vibe */
+  .crt-scanlines {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    background-image: repeating-linear-gradient(
+      0deg,
+      hsl(var(--foreground) / 0.04) 0px,
+      hsl(var(--foreground) / 0.04) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    mix-blend-mode: overlay;
+  }
+  .crt-scanlines::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse at center,
+      transparent 60%,
+      hsl(0 0% 0% / 0.35) 100%
+    );
+  }
+
+  /* Subtle CRT flicker */
+  @keyframes crt-flicker {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.97; }
+  }
+  .crt-flicker { animation: crt-flicker 6s infinite ease-in-out; }
+
+  /* Typewriter caret for AI responses */
+  @keyframes blink-caret {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+  .typewriter-caret {
+    display: inline-block;
+    width: 0.5rem;
+    height: 1em;
+    background: hsl(var(--foreground));
+    margin-left: 2px;
+    vertical-align: -2px;
+    animation: blink-caret 1s steps(1) infinite;
+  }
+
+  /* Typewriter reveal — letter cascade */
+  @keyframes type-in {
+    from { clip-path: inset(0 100% 0 0); }
+    to   { clip-path: inset(0 0 0 0); }
+  }
+  .typewriter-reveal {
+    display: inline-block;
+    overflow: hidden;
+    white-space: pre-wrap;
+    animation: type-in linear forwards;
+  }
+
   /* Send button ripple - removed for brutal look */
   .send-btn-ripple { position: relative; }
 

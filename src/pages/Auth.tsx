@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { MessageSquare, Loader2, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { motion } from 'framer-motion';
 import { z } from 'zod';
 
 const authSchema = z.object({
@@ -66,10 +64,10 @@ export default function Auth() {
         } else if (error.message.includes('Invalid login credentials')) {
           message = 'Invalid email or password. Please try again.';
         }
-        toast({ title: 'Error', description: message, variant: 'destructive' });
+        toast({ title: 'ERROR', description: message, variant: 'destructive' });
       } else {
         if (!isLogin) {
-          toast({ title: 'Account created!', description: 'Welcome to Delton. You can now start chatting.' });
+          toast({ title: 'ACCOUNT CREATED', description: 'Welcome to Delton.' });
         }
         navigate('/chat', { replace: true });
       }
@@ -78,117 +76,84 @@ export default function Auth() {
     }
   };
 
-  const stagger = {
-    hidden: { opacity: 0 as number },
-    show: { opacity: 1 as number, transition: { staggerChildren: 0.12 } },
-  };
-  const fadeUp = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] } },
-  };
-
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Left panel — branded gradient (hidden on mobile, 40% on tablet, 50% on desktop) */}
-      <div className="hidden md:flex md:w-[40%] lg:w-1/2 relative overflow-hidden items-center justify-center auth-gradient-bg">
-        {/* Floating particles */}
-        <div className="absolute inset-0 overflow-hidden">
-          {[...Array(6)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute rounded-full bg-primary/20"
-              style={{
-                width: 80 + i * 40,
-                height: 80 + i * 40,
-                left: `${15 + i * 12}%`,
-                top: `${10 + i * 14}%`,
-              }}
-              animate={{
-                y: [0, -20, 0],
-                x: [0, 10, 0],
-                scale: [1, 1.05, 1],
-                opacity: [0.15, 0.3, 0.15],
-              }}
-              transition={{ duration: 6 + i * 1.2, repeat: Infinity, ease: 'easeInOut' }}
-            />
-          ))}
+      {/* Left panel — brutal terminal block */}
+      <div className="hidden md:flex md:w-[45%] lg:w-1/2 brutal-border-r flex-col justify-between p-10">
+        <div>
+          <div className="flex items-center gap-3">
+            <div className="h-2 w-2 bg-foreground" />
+            <span className="font-mono text-[10px] tracking-[0.3em] text-muted-foreground">
+              DELTON_CORE // V2.0.0
+            </span>
+          </div>
         </div>
 
-        <div className="relative z-10 text-center px-8 lg:px-12 max-w-lg">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.7 }}
-            className="mb-8 mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-primary shadow-xl shadow-primary/30"
-          >
-            <MessageSquare className="h-10 w-10 text-primary-foreground" />
-          </motion.div>
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.6 }}
-            className="text-3xl lg:text-4xl font-bold text-foreground mb-3"
-          >
-            Delton AI
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.45, duration: 0.6 }}
-            className="text-base lg:text-lg text-muted-foreground"
-          >
-            Your intelligent AI assistant — answers, analysis, and creative help, instantly.
-          </motion.p>
+        <div>
+          <h1 className="font-display text-6xl lg:text-7xl leading-[0.9] mb-6">
+            DELTON<br/>AI.
+          </h1>
+          <div className="brutal-border-t pt-6 max-w-md">
+            <p className="font-mono text-xs tracking-wider text-muted-foreground uppercase leading-relaxed">
+              &gt; Intelligent assistant.<br/>
+              &gt; Brutalist interface.<br/>
+              &gt; Zero abstraction.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between font-mono text-[10px] tracking-widest text-muted-foreground uppercase">
+          <span>STATUS: ONLINE</span>
+          <span>LATENCY: 12MS</span>
         </div>
       </div>
 
       {/* Right panel — form */}
-      <div className="flex flex-1 flex-col items-center justify-center px-4 sm:px-6 py-12">
-        <motion.div
-          className="w-full max-w-sm"
-          variants={stagger}
-          initial="hidden"
-          animate="show"
-        >
-          {/* Mobile/tablet logo (hidden when left panel is visible on md+) */}
-          <motion.div variants={fadeUp} className="mb-8 flex flex-col items-center md:hidden">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/25">
-              <MessageSquare className="h-8 w-8 text-primary-foreground" />
-            </div>
-            <h2 className="text-xl font-bold text-foreground">Delton AI</h2>
-          </motion.div>
+      <div className="flex flex-1 flex-col items-center justify-center px-6 py-12">
+        <div className="w-full max-w-sm animate-reveal">
+          {/* Mobile-only header */}
+          <div className="mb-8 md:hidden">
+            <span className="font-mono text-[10px] tracking-[0.3em] text-muted-foreground">
+              DELTON_CORE
+            </span>
+            <h1 className="font-display text-5xl mt-2">DELTON AI.</h1>
+          </div>
 
-          <motion.div variants={fadeUp}>
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground">
-              {isLogin ? 'Welcome back' : 'Create account'}
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {isLogin ? 'Sign in to continue to Delton' : 'Sign up to start chatting with AI'}
-            </p>
-          </motion.div>
+          <div className="brutal-border-b pb-4 mb-8">
+            <span className="font-mono text-[10px] tracking-[0.3em] text-muted-foreground uppercase">
+              {isLogin ? '> LOG_IN' : '> REGISTER'}
+            </span>
+            <h2 className="font-display text-3xl mt-2 uppercase">
+              {isLogin ? 'Access Terminal' : 'Create Account'}
+            </h2>
+          </div>
 
-          <motion.form variants={fadeUp} onSubmit={handleSubmit} className="mt-8 space-y-5">
-            <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Email
-              </Label>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label htmlFor="email" className="block font-mono text-[10px] tracking-widest text-muted-foreground uppercase mb-2">
+                &gt; Email
+              </label>
               <input
                 id="email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder="user@domain.io"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className={`auth-input w-full ${errors.email ? 'auth-input-error' : ''}`}
                 disabled={isLoading}
                 autoComplete="email"
               />
-              {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+              {errors.email && (
+                <p className="mt-2 font-mono text-[10px] tracking-wider text-destructive uppercase">
+                  ! {errors.email}
+                </p>
+              )}
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="password" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Password
-              </Label>
+            <div>
+              <label htmlFor="password" className="block font-mono text-[10px] tracking-widest text-muted-foreground uppercase mb-2">
+                &gt; Password
+              </label>
               <input
                 id="password"
                 type="password"
@@ -199,61 +164,57 @@ export default function Auth() {
                 disabled={isLoading}
                 autoComplete={isLogin ? 'current-password' : 'new-password'}
               />
-              {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
+              {errors.password && (
+                <p className="mt-2 font-mono text-[10px] tracking-wider text-destructive uppercase">
+                  ! {errors.password}
+                </p>
+              )}
               {isLogin && (
                 <button
                   type="button"
                   onClick={() => navigate('/forgot-password')}
-                  className="text-xs text-primary hover:text-primary/80 transition-colors mt-1"
+                  className="mt-3 font-mono text-[10px] tracking-widest text-muted-foreground hover:text-foreground uppercase"
                 >
-                  Forgot Password?
+                  &gt; Forgot password?
                 </button>
               )}
             </div>
 
-            <motion.div variants={fadeUp}>
-              <Button
-                type="submit"
-                className="h-12 w-full text-base font-semibold auth-btn-shimmer"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : isLogin ? (
-                  'Sign In'
-                ) : (
-                  'Create Account'
-                )}
-              </Button>
-            </motion.div>
-          </motion.form>
+            <Button
+              type="submit"
+              className="btn-brutal h-12 w-full text-sm tracking-widest"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : isLogin ? (
+                '[ TRANSMIT ]'
+              ) : (
+                '[ INITIALIZE ]'
+              )}
+            </Button>
+          </form>
 
-          <motion.div variants={fadeUp} className="mt-6 text-center">
+          <div className="brutal-border-t mt-8 pt-6 flex flex-col gap-4">
             <button
               type="button"
               onClick={() => setIsLogin(!isLogin)}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] px-2"
+              className="font-mono text-[10px] tracking-widest text-muted-foreground hover:text-foreground uppercase text-left"
               disabled={isLoading}
             >
-              {isLogin ? (
-                <>Don't have an account?{' '}<span className="font-semibold text-primary">Sign up</span></>
-              ) : (
-                <>Already have an account?{' '}<span className="font-semibold text-primary">Sign in</span></>
-              )}
+              {isLogin ? '> No account? CREATE_NEW' : '> Have account? SIGN_IN'}
             </button>
-          </motion.div>
 
-          <motion.div variants={fadeUp} className="mt-6 text-center">
             <button
               type="button"
               onClick={() => navigate('/')}
-              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] px-2"
+              className="inline-flex items-center gap-2 font-mono text-[10px] tracking-widest text-muted-foreground hover:text-foreground uppercase"
             >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Back to home
+              <ArrowLeft className="h-3 w-3" />
+              Return to root
             </button>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       </div>
     </div>
   );

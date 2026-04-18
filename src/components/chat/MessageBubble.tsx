@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { MessageActions } from './MessageActions';
@@ -26,6 +27,25 @@ export function MessageBubble({
 }: MessageBubbleProps) {
   const isUser = role === 'user';
   const isAssistant = role === 'assistant';
+
+  // Typewriter reveal for completed assistant messages
+  const [revealed, setRevealed] = useState(isUser || isStreaming);
+  useEffect(() => {
+    if (isUser || isStreaming) {
+      setRevealed(true);
+      return;
+    }
+    setRevealed(false);
+    // Reveal duration scales with length but capped
+    const duration = Math.min(1200, Math.max(300, content.length * 6));
+    const t = setTimeout(() => setRevealed(true), duration);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, isStreaming]);
+
+  const revealDuration = isAssistant && !isStreaming
+    ? Math.min(1200, Math.max(300, content.length * 6))
+    : 0;
 
   return (
     <motion.div
@@ -63,12 +83,22 @@ export function MessageBubble({
               : "bg-background text-foreground brutal-border"
           )}
         >
-          <p className="whitespace-pre-wrap break-words">
-            {content}
-            {isStreaming && (
-              <span className="ml-1 inline-block h-4 w-2 bg-current animate-pulse align-middle" />
-            )}
-          </p>
+          {isAssistant && !isStreaming && !revealed ? (
+            <p className="whitespace-pre-wrap break-words">
+              <span
+                className="typewriter-reveal"
+                style={{ animationDuration: `${revealDuration}ms` }}
+              >
+                {content}
+              </span>
+              <span className="typewriter-caret" />
+            </p>
+          ) : (
+            <p className="whitespace-pre-wrap break-words">
+              {content}
+              {isStreaming && <span className="typewriter-caret" />}
+            </p>
+          )}
         </div>
 
         {isAssistant && showActions && !isStreaming && content && onFeedback && (
