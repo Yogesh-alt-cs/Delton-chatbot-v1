@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, MessageSquare, Trash2, X, Search, Loader2, Settings, Download } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Plus, Trash2, X, Search, Loader2, Settings, Download } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useConversations } from '@/hooks/useConversations';
@@ -25,7 +24,10 @@ export function ChatSidebar({ isOpen, onClose, onNewChat }: ChatSidebarProps) {
 
   useEffect(() => {
     if (!searchQuery.trim()) { setSearchResults(null); return; }
-    const timer = setTimeout(async () => { const results = await searchConversations(searchQuery); setSearchResults(results); }, 300);
+    const timer = setTimeout(async () => {
+      const results = await searchConversations(searchQuery);
+      setSearchResults(results);
+    }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery, searchConversations]);
 
@@ -37,50 +39,73 @@ export function ChatSidebar({ isOpen, onClose, onNewChat }: ChatSidebarProps) {
   return (
     <>
       {isOpen && (
-        <div className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm lg:hidden" onClick={onClose} />
+        <div className="fixed inset-0 z-40 bg-background/80 lg:hidden" onClick={onClose} />
       )}
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-72 flex-col glass-panel-strong border-r border-border/20 transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 lg:z-auto",
+          "fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-background brutal-border-r transition-transform duration-200 ease-out lg:static lg:translate-x-0 lg:z-auto",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex items-center justify-between p-3 border-b border-border/20">
-          <Button
-            variant="outline"
-            className="flex-1 justify-start gap-2 h-10 text-sm rounded-xl glass-input border-border/20"
-            onClick={() => { onNewChat(); onClose(); }}
+        {/* Brand */}
+        <div className="flex items-center justify-between p-4 brutal-border-b">
+          <div className="flex flex-col">
+            <span className="font-display text-2xl leading-none">DELTON</span>
+            <span className="font-mono text-[9px] tracking-widest text-muted-foreground mt-1">CORE_SYSTEM</span>
+          </div>
+          <button
+            className="lg:hidden p-2 hover:bg-foreground hover:text-background transition-colors"
+            onClick={onClose}
           >
-            <Plus className="h-4 w-4" /> New Chat
-          </Button>
-          <Button variant="ghost" size="icon" className="h-10 w-10 lg:hidden ml-2" onClick={onClose}>
-            <X className="h-5 w-5" />
-          </Button>
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
-        <div className="p-3">
+        {/* New chat */}
+        <div className="p-3 brutal-border-b">
+          <button
+            className="w-full btn-brutal text-xs"
+            onClick={() => { onNewChat(); onClose(); }}
+          >
+            <Plus className="h-4 w-4" />
+            NEW_CHAT
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="p-3 brutal-border-b">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search chats..."
-              className="h-9 pl-8 text-sm rounded-xl glass-input border-border/20"
+              placeholder="SEARCH..."
+              className="h-9 pl-8 text-xs font-mono bg-background brutal-border tracking-wider placeholder:text-muted-foreground"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-2 pb-20 no-scrollbar">
+        {/* History header */}
+        <div className="px-3 py-2 brutal-border-b">
+          <span className="font-mono text-[10px] tracking-widest text-muted-foreground">
+            HISTORY_LOG
+          </span>
+        </div>
+
+        <div className="flex-1 overflow-y-auto pb-20 no-scrollbar">
           {isLoading ? (
-            <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-foreground" />
+            </div>
           ) : displayConversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
-              <MessageSquare className="h-8 w-8 text-muted-foreground/30 mb-2" />
-              <p className="text-sm text-muted-foreground">{searchQuery ? 'No results found' : 'No conversations yet'}</p>
+              <p className="font-mono text-[11px] tracking-wider text-muted-foreground uppercase">
+                {searchQuery ? 'NO_RESULTS' : 'NO_CONVERSATIONS'}
+              </p>
             </div>
           ) : (
-            <div className="space-y-0.5">
+            <div>
               {displayConversations.map((conv) => {
                 const isActive = conv.id === conversationId;
                 const isDeleting = deletingIds.has(conv.id);
@@ -90,23 +115,33 @@ export function ChatSidebar({ isOpen, onClose, onNewChat }: ChatSidebarProps) {
                     onClick={() => handleSelectConversation(conv.id)}
                     disabled={isDeleting}
                     className={cn(
-                      "group flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition-all",
-                      isActive ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                      "group flex w-full items-center gap-2 px-3 py-3 text-left text-xs brutal-border-b transition-colors",
+                      isActive
+                        ? "bg-foreground text-background"
+                        : "bg-background text-foreground hover:bg-foreground hover:text-background",
                       isDeleting && "opacity-50"
                     )}
                   >
-                    <MessageSquare className="h-4 w-4 shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="truncate font-medium text-sm">{conv.title}</p>
-                      <p className="truncate text-xs text-muted-foreground/60">{formatConversationDate(conv.updated_at)}</p>
+                      <p className="truncate font-mono font-bold uppercase tracking-wider">{conv.title.replace(/\s+/g, '_').slice(0, 32)}</p>
+                      <p className="truncate font-mono text-[9px] tracking-widest opacity-60 mt-0.5">
+                        {formatConversationDate(conv.updated_at).toUpperCase()}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 shrink-0 transition-all">
-                      <button onClick={(e) => handleDownloadPdf(e, conv.id)} className="p-1 rounded-lg hover:bg-primary/10 hover:text-primary transition-all" title="Download as PDF">
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 shrink-0">
+                      <span
+                        onClick={(e) => handleDownloadPdf(e, conv.id)}
+                        className="p-1 hover:bg-background hover:text-foreground"
+                        title="Download PDF"
+                      >
                         <Download className="h-3.5 w-3.5" />
-                      </button>
-                      <button onClick={(e) => handleDelete(e, conv.id)} className="p-1 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-all" disabled={isDeleting}>
+                      </span>
+                      <span
+                        onClick={(e) => handleDelete(e, conv.id)}
+                        className="p-1 hover:bg-destructive hover:text-destructive-foreground"
+                      >
                         {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                      </button>
+                      </span>
                     </div>
                   </button>
                 );
@@ -115,14 +150,14 @@ export function ChatSidebar({ isOpen, onClose, onNewChat }: ChatSidebarProps) {
           )}
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 border-t border-border/20 glass-panel-strong p-3">
-          <Button
-            variant="ghost"
-            className="w-full justify-start gap-2 h-10 text-sm text-muted-foreground hover:text-foreground rounded-xl"
+        {/* Footer */}
+        <div className="absolute bottom-0 left-0 right-0 brutal-border-t bg-background">
+          <button
+            className="w-full flex items-center justify-start gap-2 px-4 py-3 text-xs font-mono uppercase tracking-wider hover:bg-foreground hover:text-background transition-colors"
             onClick={() => { navigate('/settings'); onClose(); }}
           >
-            <Settings className="h-4 w-4" /> Settings
-          </Button>
+            <Settings className="h-4 w-4" /> SETTINGS
+          </button>
         </div>
       </aside>
     </>
