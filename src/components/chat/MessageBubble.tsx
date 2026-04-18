@@ -1,5 +1,4 @@
 import { cn } from '@/lib/utils';
-import { Bot, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { MessageActions } from './MessageActions';
 import { Feedback, MessageImage } from '@/lib/types';
@@ -30,29 +29,27 @@ export function MessageBubble({
 
   return (
     <motion.div
-      className={cn(
-        "group flex gap-3 px-4 py-4 transition-colors",
-        isUser ? "justify-end" : "justify-start"
-      )}
-      initial={{ opacity: 0, y: 12 }}
+      className="group flex gap-0 px-4 py-3 brutal-border-b"
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
     >
-      {isAssistant && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full glass-panel mt-0.5">
-          <Bot className="h-4 w-4 text-primary" />
-        </div>
-      )}
+      {/* Author label column */}
+      <div className="w-20 shrink-0 pt-1">
+        <span className="font-mono text-[10px] tracking-widest text-muted-foreground">
+          {isUser ? 'USER >' : 'DELTON >'}
+        </span>
+      </div>
 
-      <div className={cn("flex flex-col gap-1.5 max-w-[85%] sm:max-w-[75%] md:max-w-[70%]", isUser ? "items-end" : "items-start")}>
+      <div className="flex-1 min-w-0 flex flex-col gap-2">
         {images && images.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-1">
+          <div className="flex flex-wrap gap-2">
             {images.map((image, index) => (
               <img
                 key={index}
                 src={image.url}
                 alt={`Uploaded ${index + 1}`}
-                className="max-w-[200px] max-h-[200px] rounded-2xl object-cover border border-border/30"
+                className="max-w-[220px] max-h-[220px] object-cover brutal-border"
               />
             ))}
           </div>
@@ -60,16 +57,16 @@ export function MessageBubble({
 
         <div
           className={cn(
-            "rounded-[20px] px-4 py-3 text-sm leading-relaxed",
+            "px-3 py-2 text-sm leading-relaxed font-sans",
             isUser
-              ? "bg-primary text-primary-foreground rounded-br-lg"
-              : "glass-panel rounded-bl-lg"
+              ? "bg-foreground text-background"
+              : "bg-background text-foreground brutal-border"
           )}
         >
           <p className="whitespace-pre-wrap break-words">
             {content}
             {isStreaming && (
-              <span className="ml-1 inline-block h-4 w-0.5 animate-pulse bg-current rounded-full" />
+              <span className="ml-1 inline-block h-4 w-2 bg-current animate-pulse align-middle" />
             )}
           </p>
         </div>
@@ -83,12 +80,6 @@ export function MessageBubble({
           />
         )}
       </div>
-
-      {isUser && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary mt-0.5">
-          <User className="h-4 w-4 text-primary-foreground" />
-        </div>
-      )}
     </motion.div>
   );
 }
